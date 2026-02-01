@@ -3,7 +3,9 @@ command = "npm run build"
 functions = "netlify/functions"
 publish = "dist"
 
+# SPA fallback (force=false ensures functions and static assets are not redirected)
 [[redirects]]
 from = "/*"
 to = "/index.html"
 status = 200
+force = false
