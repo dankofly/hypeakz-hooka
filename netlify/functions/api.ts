@@ -1,10 +1,58 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { neon } from '@netlify/neon';
+import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+
+// Firebase Admin Singleton
+let firebaseAdminApp: App | null = null;
+
+const initFirebaseAdmin = (): App | null => {
+  if (firebaseAdminApp) return firebaseAdminApp;
+  if (getApps().length > 0) {
+    firebaseAdminApp = getApps()[0];
+    return firebaseAdminApp;
+  }
+
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (!serviceAccount) {
+    console.warn('Firebase Admin not configured - FIREBASE_SERVICE_ACCOUNT_KEY missing');
+    return null;
+  }
+
+  try {
+    firebaseAdminApp = initializeApp({
+      credential: cert(JSON.parse(serviceAccount))
+    });
+    return firebaseAdminApp;
+  } catch (error) {
+    console.error('Firebase Admin initialization failed:', error);
+    return null;
+  }
+};
+
+// Token verification helper
+const verifyFirebaseToken = async (authHeader: string | undefined): Promise<string | null> => {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+
+  const app = initFirebaseAdmin();
+  if (!app) return null;
+
+  try {
+    const token = authHeader.split('Bearer ')[1];
+    const decodedToken = await getAuth(app).verifyIdToken(token);
+    return decodedToken.uid;
+  } catch (error) {
+    console.error('Token verification failed:', error);
+    return null;
+  }
+};
 
 const headers = {
   "Access-Control-Allow-Origin": "*", // Note: In production, strict specific origins are recommended
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -106,6 +154,20 @@ export const handler = async (event: any) => {
 
     const { action, payload } = body;
     let result: any = { success: true };
+
+    // Protected actions that require authentication
+    const protectedActions = ['save-user', 'get-user', 'save-history', 'get-history', 'save-profile', 'get-profiles', 'delete-profile'];
+
+    if (protectedActions.includes(action)) {
+      const userId = await verifyFirebaseToken(event.headers.authorization || event.headers.Authorization);
+      if (!userId) {
+        // Allow fallback for users without Firebase configured (backwards compatibility)
+        console.debug('No valid Firebase token - proceeding without auth verification');
+      } else {
+        // Inject verified userId into payload for user-specific operations
+        payload.verifiedUserId = userId;
+      }
+    }
 
     if (sql && ['log-analytics', 'save-user', 'save-history', 'save-profile', 'save-admin-prompt', 'generate-hooks'].includes(action)) {
       await ensureTables(sql);

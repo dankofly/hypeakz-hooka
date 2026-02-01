@@ -1,85 +1,149 @@
-
 import { UserProfile } from '../types.ts';
 import { analytics } from './analytics.ts';
+import {
+  auth,
+  googleProvider,
+  signInWithPopup,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendEmailVerification,
+  signOut,
+  User
+} from './firebase.ts';
 
-export type AuthProvider = 'google' | 'apple' | 'meta';
+export type AuthProvider = 'google' | 'email';
 
-// Helper to generate a stable ID from a string (email)
-const generateStableId = (str: string): string => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0; // Convert to 32bit integer
-  }
-  return Math.abs(hash).toString(16);
+// Helper to convert Firebase User to UserProfile
+const firebaseUserToProfile = (user: User): UserProfile => {
+  return {
+    id: user.uid,
+    name: user.displayName || user.email?.split('@')[0] || 'User',
+    brand: '',
+    email: user.email || '',
+    phone: user.phoneNumber || '',
+    createdAt: Date.parse(user.metadata.creationTime || '') || Date.now(),
+    emailVerified: user.emailVerified
+  };
 };
 
-/**
- * Der authService simuliert nun einen realistischen OAuth-Flow.
- * Anstatt nur zu warten, wird ein Prozess-Lifecycle durchlaufen,
- * der Metadaten von den jeweiligen Providern "abruft".
- */
+// Get Firebase ID token for API verification
+export const getIdToken = async (): Promise<string | null> => {
+  const user = auth.currentUser;
+  if (!user) return null;
+  return user.getIdToken();
+};
+
 export const authService = {
+  // Google OAuth Login
+  async signInWithGoogle(): Promise<UserProfile> {
+    analytics.track('sso_start', { provider: 'google' });
+
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const profile = firebaseUserToProfile(result.user);
+
+      analytics.track('sso_success', {
+        provider: 'google',
+        userId: profile.id,
+        name: profile.name,
+        email: profile.email
+      });
+
+      return profile;
+    } catch (error: any) {
+      analytics.track('sso_error', { provider: 'google', error: error.code });
+      throw error;
+    }
+  },
+
+  // Email/Password Registration with Email Verification
+  async registerWithEmail(email: string, password: string): Promise<{ user: UserProfile; needsVerification: boolean }> {
+    analytics.track('register_start', { provider: 'email' });
+
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+
+      // Send verification email
+      await sendEmailVerification(result.user, {
+        url: window.location.origin + '/?verified=true',
+        handleCodeInApp: false
+      });
+
+      const profile = firebaseUserToProfile(result.user);
+
+      analytics.track('register_success', {
+        userId: profile.id,
+        email: profile.email,
+        emailVerified: false
+      });
+
+      return { user: profile, needsVerification: true };
+    } catch (error: any) {
+      analytics.track('register_error', { error: error.code });
+      throw error;
+    }
+  },
+
+  // Email/Password Login (requires verified email)
+  async signInWithEmail(email: string, password: string): Promise<UserProfile> {
+    analytics.track('login_start', { provider: 'email' });
+
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+
+      // Check email verification (2FA requirement)
+      if (!result.user.emailVerified) {
+        // Resend verification email
+        await sendEmailVerification(result.user);
+        throw new Error('EMAIL_NOT_VERIFIED');
+      }
+
+      const profile = firebaseUserToProfile(result.user);
+
+      analytics.track('login_success', {
+        provider: 'email',
+        userId: profile.id,
+        email: profile.email
+      });
+
+      return profile;
+    } catch (error: any) {
+      analytics.track('login_error', { provider: 'email', error: error.code || error.message });
+      throw error;
+    }
+  },
+
+  // Resend verification email
+  async resendVerificationEmail(): Promise<void> {
+    const user = auth.currentUser;
+    if (user && !user.emailVerified) {
+      await sendEmailVerification(user);
+    }
+  },
+
+  // Check if current user's email is verified
+  isEmailVerified(): boolean {
+    return auth.currentUser?.emailVerified ?? false;
+  },
+
+  // Logout
+  async logout(): Promise<void> {
+    await signOut(auth);
+    analytics.track('logout');
+  },
+
+  // Get current user
+  getCurrentUser(): UserProfile | null {
+    const user = auth.currentUser;
+    if (!user) return null;
+    return firebaseUserToProfile(user);
+  },
+
+  // Legacy method for backward compatibility
   async signInWithSocial(provider: AuthProvider): Promise<UserProfile> {
-    analytics.track('sso_start', { provider });
-    
-    // Wir simulieren das Öffnen eines Popups und den Austausch von Tokens
-    return new Promise((resolve, reject) => {
-      // Zeit für den "Handshake"
-      const authDuration = provider === 'google' ? 2000 : 1500;
-      
-      setTimeout(() => {
-        // Mock-Daten der Provider inklusive Email und Telefon
-        const providerData: Record<AuthProvider, { name: string; brand: string; email: string; phone: string }> = {
-          google: { 
-            name: 'Daniel Kofler', 
-            brand: 'HYPEAKZ.IO Agency',
-            email: 'mail@danielkofler.com',
-            phone: '+43 676 7293888'
-          },
-          apple: { 
-            name: 'Jordan Sterling', 
-            brand: 'Sterling Creative',
-            email: 'j.sterling@icloud.com',
-            phone: '+1 555 0123 456'
-          },
-          meta: { 
-            name: 'Casey Vance', 
-            brand: 'Social Growth Labs',
-            email: 'casey@meta-partners.com',
-            phone: '+1 415 999 8888'
-          }
-        };
-
-        const data = providerData[provider];
-        
-        if (!data) {
-          reject(new Error("Provider authentication failed"));
-          return;
-        }
-
-        // Generate stable ID based on email to track unique users correctly across sessions
-        const stableId = `${provider}-${generateStableId(data.email)}`;
-
-        const user: UserProfile = {
-          id: stableId,
-          name: data.name,
-          brand: data.brand,
-          email: data.email,
-          phone: data.phone,
-          createdAt: Date.now()
-        };
-
-        analytics.track('sso_success', { 
-          provider, 
-          userId: user.id, 
-          name: user.name, 
-          email: user.email 
-        });
-        
-        resolve(user);
-      }, authDuration);
-    });
+    if (provider === 'google') {
+      return this.signInWithGoogle();
+    }
+    throw new Error('UNSUPPORTED_PROVIDER');
   }
 };

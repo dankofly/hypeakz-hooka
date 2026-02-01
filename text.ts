@@ -204,7 +204,22 @@ export const TRANSLATIONS = {
       authenticatingTitle: "Authenticating...",
       connecting: "Connecting to identity node",
       continueWith: "Continue with",
-      synchronizing: "Synchronizing..."
+      synchronizing: "Synchronizing...",
+      // Email/Password specific
+      emailLabel: "Email Address",
+      passwordLabel: "Password",
+      loginButton: "Sign In",
+      registerButton: "Register",
+      orContinueWith: "Or continue with",
+      createAccount: "Create Account",
+      alreadyHaveAccount: "Already have an account?",
+      noAccount: "No account yet?",
+      backToOptions: "Back",
+      // Verification
+      verificationSent: "Verification email sent! Please check your inbox.",
+      emailNotVerified: "Please verify your email first. A new verification email has been sent.",
+      resendVerification: "Resend Email",
+      checkingVerification: "Checking verification..."
     },
     profileEdit: {
       title: "Identity",
@@ -281,10 +296,18 @@ export const TRANSLATIONS = {
     errors: {
       authFailed: "Authentication failed.",
       engineError: "AI-Engine Error.",
-      profileSyncFailed: "Fehler beim Profil-Sync. Bitte erneut versuchen.",
+      profileSyncFailed: "Profile sync failed. Please try again.",
       missingKey: "SERVER ERROR: API Key Missing.\n\nPlease ensure 'GEMINI_API_KEY' is set in Netlify Environment Variables (WITHOUT VITE_ prefix).",
-      invalidProviderOpenAI: "CONFIG ERROR: Falscher API Key Typ.\n\nDu verwendest einen OpenAI Key (sk-...). Diese App benötigt einen GOOGLE GEMINI Key (AIza...).\nBitte erstelle einen Key im Google AI Studio.",
-      scoutError: "Fehler bei der Website-Analyse."
+      invalidProviderOpenAI: "CONFIG ERROR: Wrong API Key type.\n\nYou're using an OpenAI Key (sk-...). This app requires a GOOGLE GEMINI Key (AIza...).\nPlease create one in Google AI Studio.",
+      scoutError: "Error analyzing website.",
+      // Firebase-specific errors
+      emailInUse: "This email is already in use",
+      invalidEmail: "Invalid email address",
+      weakPassword: "Password must be at least 6 characters",
+      userNotFound: "No account found with this email",
+      wrongPassword: "Incorrect password",
+      tooManyRequests: "Too many attempts. Please wait.",
+      popupClosed: "Sign-in was cancelled"
     }
   },
 
@@ -479,7 +502,22 @@ export const TRANSLATIONS = {
       authenticatingTitle: "Authenticating...",
       connecting: "Verbinde zu Identity Node",
       continueWith: "Weiter mit",
-      synchronizing: "Synchronisiere..."
+      synchronizing: "Synchronisiere...",
+      // Email/Password specific
+      emailLabel: "E-Mail Adresse",
+      passwordLabel: "Passwort",
+      loginButton: "Anmelden",
+      registerButton: "Registrieren",
+      orContinueWith: "Oder fortfahren mit",
+      createAccount: "Konto erstellen",
+      alreadyHaveAccount: "Bereits ein Konto?",
+      noAccount: "Noch kein Konto?",
+      backToOptions: "Zurück",
+      // Verification
+      verificationSent: "Verifizierungs-E-Mail gesendet! Bitte prüfe deinen Posteingang.",
+      emailNotVerified: "Bitte bestätige zuerst deine E-Mail. Eine neue E-Mail wurde gesendet.",
+      resendVerification: "Erneut senden",
+      checkingVerification: "Verifizierung wird geprüft..."
     },
     profileEdit: {
       title: "Identität",
@@ -557,9 +595,17 @@ export const TRANSLATIONS = {
       authFailed: "Authentifizierung fehlgeschlagen.",
       engineError: "AI-Engine Error.",
       profileSyncFailed: "Fehler beim Profil-Sync. Bitte erneut versuchen.",
-      missingKey: "SERVER ERROR: API Key Missing.\n\ Bitte stelle sicher, dass 'GEMINI_API_KEY' in den Netlify Environment Variables gesetzt ist (OHNE VITE_ Prefix).",
+      missingKey: "SERVER ERROR: API Key Missing.\n\nBitte stelle sicher, dass 'GEMINI_API_KEY' in den Netlify Environment Variables gesetzt ist (OHNE VITE_ Prefix).",
       invalidProviderOpenAI: "CONFIG ERROR: Falscher API Key Typ.\n\nDu verwendest einen OpenAI Key (sk-...). Diese App benötigt einen GOOGLE GEMINI Key (AIza...).\nBitte erstelle einen Key im Google AI Studio.",
-      scoutError: "Fehler bei der Website-Analyse."
+      scoutError: "Fehler bei der Website-Analyse.",
+      // Firebase-specific errors
+      emailInUse: "Diese E-Mail wird bereits verwendet",
+      invalidEmail: "Ungültige E-Mail-Adresse",
+      weakPassword: "Passwort muss mindestens 6 Zeichen haben",
+      userNotFound: "Kein Konto mit dieser E-Mail gefunden",
+      wrongPassword: "Falsches Passwort",
+      tooManyRequests: "Zu viele Versuche. Bitte warten.",
+      popupClosed: "Anmeldung abgebrochen"
     }
   }
 };

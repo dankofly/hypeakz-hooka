@@ -1,5 +1,6 @@
 
 import { HistoryItem, BriefProfile, UserProfile } from '../types.ts';
+import { getIdToken } from './auth.ts';
 
 // Local Storage Keys
 const LS_KEYS = {
@@ -27,23 +28,38 @@ const storage = {
   }
 };
 
-// Helper to call the API with Timeout
+// Helper to call the API with Timeout and Auth Token
 const callApi = async (action: string, payload: any = {}) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s Timeout
 
   try {
+    // Get Firebase token for authenticated requests
+    const token = await getIdToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch('/.netlify/functions/api', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ action, payload }),
       signal: controller.signal
     });
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) return null;
-    
+    if (!response.ok) {
+      if (response.status === 401) {
+        console.warn('Unauthorized API call - user may need to re-authenticate');
+      }
+      return null;
+    }
+
     // Check content type to avoid crashing on HTML (404/500 pages)
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.indexOf("application/json") === -1) {
@@ -53,7 +69,6 @@ const callApi = async (action: string, payload: any = {}) => {
     return await response.json();
   } catch (error) {
     // Ignore AbortErrors (Timeouts) and standard fetch errors
-    // console.debug(`DB API call skipped/failed [${action}]`);
     return null;
   }
 };

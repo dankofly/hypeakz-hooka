@@ -6,6 +6,7 @@ export interface UserProfile {
   email: string;
   phone?: string;
   createdAt: number;
+  emailVerified?: boolean;
 }
 
 export interface NeuroScores {

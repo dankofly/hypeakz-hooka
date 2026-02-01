@@ -4,7 +4,8 @@ import { MarketingBrief, ViralConcept, GenerationStatus, HistoryItem, BriefProfi
 import { generateViralHooks } from './services/gemini.ts';
 import { db } from './services/db.ts';
 import { analytics } from './services/analytics.ts';
-import { authService, AuthProvider } from './services/auth.ts';
+import { authService } from './services/auth.ts';
+import { useAuth } from './hooks/useAuth.ts';
 import { BriefEditor } from './components/BriefEditor.tsx';
 import { ConceptCard } from './components/ConceptCard.tsx';
 import { HistoryList } from './components/HistoryList.tsx';
@@ -15,6 +16,21 @@ import { ConsentBanner } from './components/ConsentBanner.tsx';
 import { ProfileEditModal } from './components/ProfileEditModal.tsx';
 import { AdminModal } from './components/AdminModal.tsx';
 import { TRANSLATIONS } from './text.ts';
+
+// Helper for Firebase error messages
+const getFirebaseErrorMessage = (code: string, t: any): string => {
+  const messages: Record<string, string> = {
+    'auth/email-already-in-use': t.errors.emailInUse,
+    'auth/invalid-email': t.errors.invalidEmail,
+    'auth/weak-password': t.errors.weakPassword,
+    'auth/user-not-found': t.errors.userNotFound,
+    'auth/wrong-password': t.errors.wrongPassword,
+    'auth/too-many-requests': t.errors.tooManyRequests,
+    'auth/popup-closed-by-user': t.errors.popupClosed,
+    'auth/invalid-credential': t.errors.wrongPassword,
+  };
+  return messages[code] || t.errors.authFailed;
+};
 
 const STORAGE_KEY_THEME = 'hypeakz_theme';
 const STORAGE_KEY_USER = 'hypeakz_user_profile';
@@ -55,10 +71,19 @@ const TutorialCard = ({ step, title, desc }: { step: string, title: string, desc
 );
 
 const App: React.FC = () => {
+  // Firebase Auth Hook
+  const { user: firebaseUser, loading: authLoading, emailVerified } = useAuth();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isAuthenticating, setIsAuthenticating] = useState<AuthProvider | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState<string | null>(null);
+
+  // Email Auth State
+  const [authMode, setAuthMode] = useState<'select' | 'email-login' | 'email-register'>('select');
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [pendingVerification, setPendingVerification] = useState(false);
   
   // UI Language state
   const [appLanguage, setAppLanguage] = useState<Language>('DE');
@@ -86,6 +111,38 @@ const App: React.FC = () => {
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
 
+  // Sync Firebase user with local state
+  useEffect(() => {
+    if (firebaseUser && !authLoading) {
+      setUser(firebaseUser);
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(firebaseUser));
+      // Background sync with DB
+      db.getUser(firebaseUser.id).then(cloudUser => {
+        if (cloudUser && cloudUser.brand) {
+          const merged = { ...firebaseUser, ...cloudUser };
+          setUser(merged);
+          localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(merged));
+        }
+      }).catch(err => console.debug("Offline or Sync Failed:", err));
+    } else if (!firebaseUser && !authLoading) {
+      // Check for legacy local user (before Firebase migration)
+      const savedUser = localStorage.getItem(STORAGE_KEY_USER);
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          // If it's a Firebase UID format, clear it (user logged out)
+          if (!parsed.id.includes('-')) {
+            localStorage.removeItem(STORAGE_KEY_USER);
+            setUser(null);
+          }
+        } catch (e) {
+          localStorage.removeItem(STORAGE_KEY_USER);
+        }
+      }
+      setUser(null);
+    }
+  }, [firebaseUser, authLoading]);
+
   useEffect(() => {
     const savedTheme = localStorage.getItem(STORAGE_KEY_THEME);
     const darkMode = savedTheme ? savedTheme === 'dark' : false;
@@ -95,28 +152,10 @@ const App: React.FC = () => {
     } else {
       document.documentElement.classList.remove('dark');
     }
-    
+
     const savedLang = localStorage.getItem(STORAGE_KEY_APP_LANG);
     if (savedLang === 'DE' || savedLang === 'EN') {
       setAppLanguage(savedLang as Language);
-    }
-    
-    // Initial Load: User
-    try {
-      const savedUser = localStorage.getItem(STORAGE_KEY_USER);
-      if (savedUser) {
-        const parsed = JSON.parse(savedUser);
-        setUser(parsed);
-        // Background sync check
-        db.getUser(parsed.id).then(cloudUser => {
-          if (cloudUser) {
-            setUser(cloudUser);
-            localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(cloudUser));
-          }
-        }).catch(err => console.debug("Offline or Sync Failed:", err));
-      }
-    } catch (e) {
-      console.warn("Could not load local user data", e);
     }
 
     // Initial Load: Data
@@ -136,32 +175,84 @@ const App: React.FC = () => {
     setBrief(prev => ({ ...prev, [key]: value }));
   }, []);
 
-  const handleSocialLogin = async (provider: AuthProvider) => {
-    setIsAuthenticating(provider);
+  const handleGoogleLogin = async () => {
+    setIsAuthenticating('google');
+    setAuthError(null);
     try {
-      const newUser = await authService.signInWithSocial(provider);
-      
-      // OPTIMISTIC UI UPDATE: Log in immediately, don't wait for DB
-      setUser(newUser);
-      try {
-        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser));
-      } catch (e) {
-        console.warn("Local storage blocked");
-      }
-
+      const newUser = await authService.signInWithGoogle();
+      await db.saveUser(newUser);
       setIsLoginModalOpen(false);
       setIsProfileModalOpen(true);
-      analytics.track('login_success', { provider, name: newUser.name });
-
-      // Sync DB in background
-      db.saveUser(newUser).catch(err => console.warn("Background DB sync failed", err));
-
-    } catch (err) {
-      console.error("Login failed", err);
-      setError(t.errors.authFailed);
+      resetAuthModal();
+      analytics.track('login_success', { provider: 'google', name: newUser.name });
+    } catch (err: any) {
+      console.error("Google login failed", err);
+      setAuthError(getFirebaseErrorMessage(err.code, t));
     } finally {
       setIsAuthenticating(null);
     }
+  };
+
+  const handleEmailLogin = async () => {
+    if (!emailInput || !passwordInput) return;
+    setIsAuthenticating('email');
+    setAuthError(null);
+    try {
+      const newUser = await authService.signInWithEmail(emailInput, passwordInput);
+      await db.saveUser(newUser);
+      setIsLoginModalOpen(false);
+      setIsProfileModalOpen(true);
+      resetAuthModal();
+      analytics.track('login_success', { provider: 'email', email: newUser.email });
+    } catch (err: any) {
+      if (err.message === 'EMAIL_NOT_VERIFIED') {
+        setPendingVerification(true);
+        setAuthError(t.auth.emailNotVerified);
+      } else {
+        setAuthError(getFirebaseErrorMessage(err.code, t));
+      }
+    } finally {
+      setIsAuthenticating(null);
+    }
+  };
+
+  const handleEmailRegister = async () => {
+    if (!emailInput || !passwordInput) return;
+    setIsAuthenticating('email');
+    setAuthError(null);
+    try {
+      const { user: newUser, needsVerification } = await authService.registerWithEmail(emailInput, passwordInput);
+      await db.saveUser(newUser);
+      if (needsVerification) {
+        setPendingVerification(true);
+        setAuthError(t.auth.verificationSent);
+      }
+      analytics.track('register_success', { email: newUser.email });
+    } catch (err: any) {
+      setAuthError(getFirebaseErrorMessage(err.code, t));
+    } finally {
+      setIsAuthenticating(null);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setIsAuthenticating('resend');
+    try {
+      await authService.resendVerificationEmail();
+      setAuthError(t.auth.verificationSent);
+    } catch (err: any) {
+      setAuthError(getFirebaseErrorMessage(err.code, t));
+    } finally {
+      setIsAuthenticating(null);
+    }
+  };
+
+  const resetAuthModal = () => {
+    setAuthMode('select');
+    setEmailInput('');
+    setPasswordInput('');
+    setAuthError(null);
+    setPendingVerification(false);
   };
 
   const handleUpdateProfile = async (updatedUser: UserProfile) => {
@@ -178,7 +269,12 @@ const App: React.FC = () => {
     await db.saveUser(updatedUser);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch (e) {
+      console.warn("Logout error", e);
+    }
     setUser(null);
     localStorage.removeItem(STORAGE_KEY_USER);
   };
@@ -402,7 +498,7 @@ const App: React.FC = () => {
 
       {isLoginModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-xl animate-in fade-in duration-500" onClick={() => !isAuthenticating && setIsLoginModalOpen(false)} />
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-xl animate-in fade-in duration-500" onClick={() => !isAuthenticating && (setIsLoginModalOpen(false), resetAuthModal())} />
           <div className="relative bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 w-full max-w-md rounded-3xl shadow-2xl p-6 md:p-10 animate-in fade-in zoom-in duration-500">
             <div className="text-center mb-8 md:mb-10">
               <div className="flex justify-center mb-6">
@@ -412,34 +508,194 @@ const App: React.FC = () => {
                 {isAuthenticating ? t.auth.authenticatingTitle : t.auth.modalTitle}
               </h2>
               <p className="text-zinc-500 text-xs mt-3 font-bold tracking-widest uppercase">
-                {isAuthenticating ? `${t.auth.connecting} ${isAuthenticating}` : t.auth.modalSubtitle}
+                {isAuthenticating ? `${t.auth.connecting}...` : t.auth.modalSubtitle}
               </p>
             </div>
-            <div className="space-y-3">
-              {(['google', 'apple', 'meta'] as AuthProvider[]).map((provider) => (
-                <button 
-                  key={provider}
+
+            {/* Error Message */}
+            {authError && (
+              <div className={`mb-6 p-4 rounded-lg text-sm font-medium ${pendingVerification ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30' : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/30'}`}>
+                {authError}
+                {pendingVerification && (
+                  <button
+                    onClick={handleResendVerification}
+                    disabled={isAuthenticating === 'resend'}
+                    className="mt-2 w-full py-2 bg-blue-500 text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-blue-600 transition-colors disabled:opacity-50"
+                  >
+                    {isAuthenticating === 'resend' ? '...' : t.auth.resendVerification}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Auth Mode: Select */}
+            {authMode === 'select' && !pendingVerification && (
+              <div className="space-y-3">
+                {/* Google Button */}
+                <button
                   disabled={!!isAuthenticating}
-                  onClick={() => handleSocialLogin(provider)}
+                  onClick={handleGoogleLogin}
                   className={`w-full py-3.5 md:py-4 px-6 border rounded-lg flex items-center justify-between transition-all font-bold text-xs uppercase tracking-widest shadow-sm group haptic-btn ${
-                    isAuthenticating === provider 
-                      ? 'bg-purple-600 border-purple-600 text-white' 
+                    isAuthenticating === 'google'
+                      ? 'bg-purple-600 border-purple-600 text-white'
                       : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-white dark:hover:bg-zinc-800'
                   }`}
                 >
-                  <span className={isAuthenticating === provider ? '' : 'text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors'}>
-                    {isAuthenticating === provider ? t.auth.synchronizing : `${t.auth.continueWith} ${provider}`}
+                  <span className={isAuthenticating === 'google' ? '' : 'text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors'}>
+                    {isAuthenticating === 'google' ? t.auth.synchronizing : `${t.auth.continueWith} Google`}
                   </span>
-                  {isAuthenticating === provider ? (
+                  {isAuthenticating === 'google' ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   ) : (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white">
-                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                     </svg>
                   )}
                 </button>
-              ))}
-            </div>
+
+                {/* Divider */}
+                <div className="flex items-center gap-4 py-2">
+                  <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-800"></div>
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{t.auth.orContinueWith}</span>
+                  <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-800"></div>
+                </div>
+
+                {/* Email Options */}
+                <button
+                  onClick={() => setAuthMode('email-login')}
+                  className="w-full py-3.5 md:py-4 px-6 border rounded-lg flex items-center justify-between transition-all font-bold text-xs uppercase tracking-widest shadow-sm group haptic-btn bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-white dark:hover:bg-zinc-800"
+                >
+                  <span className="text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">
+                    {t.auth.loginButton} (Email)
+                  </span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                  </svg>
+                </button>
+
+                <button
+                  onClick={() => setAuthMode('email-register')}
+                  className="w-full py-3.5 md:py-4 px-6 border rounded-lg flex items-center justify-between transition-all font-bold text-xs uppercase tracking-widest shadow-sm group haptic-btn bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-white dark:hover:bg-zinc-800"
+                >
+                  <span className="text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">
+                    {t.auth.createAccount}
+                  </span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white">
+                    <path d="M12 5v14M5 12h14"/>
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            {/* Auth Mode: Email Login */}
+            {authMode === 'email-login' && !pendingVerification && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">{t.auth.emailLabel}</label>
+                  <input
+                    type="email"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    placeholder="email@example.com"
+                    disabled={!!isAuthenticating}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">{t.auth.passwordLabel}</label>
+                  <input
+                    type="password"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleEmailLogin()}
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    placeholder="********"
+                    disabled={!!isAuthenticating}
+                  />
+                </div>
+                <button
+                  onClick={handleEmailLogin}
+                  disabled={!!isAuthenticating || !emailInput || !passwordInput}
+                  className="w-full py-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg font-black text-xs uppercase tracking-widest hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isAuthenticating === 'email' ? t.auth.synchronizing : t.auth.loginButton}
+                </button>
+                <div className="flex justify-between items-center pt-2">
+                  <button onClick={() => setAuthMode('select')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-widest">
+                    {t.auth.backToOptions}
+                  </button>
+                  <button onClick={() => setAuthMode('email-register')} className="text-[10px] font-bold text-purple-500 hover:text-purple-600 uppercase tracking-widest">
+                    {t.auth.noAccount}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Auth Mode: Email Register */}
+            {authMode === 'email-register' && !pendingVerification && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">{t.auth.emailLabel}</label>
+                  <input
+                    type="email"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    placeholder="email@example.com"
+                    disabled={!!isAuthenticating}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">{t.auth.passwordLabel}</label>
+                  <input
+                    type="password"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleEmailRegister()}
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    placeholder="Min. 6 characters"
+                    disabled={!!isAuthenticating}
+                  />
+                </div>
+                <button
+                  onClick={handleEmailRegister}
+                  disabled={!!isAuthenticating || !emailInput || !passwordInput}
+                  className="w-full py-4 bg-purple-600 text-white rounded-lg font-black text-xs uppercase tracking-widest hover:bg-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isAuthenticating === 'email' ? t.auth.synchronizing : t.auth.registerButton}
+                </button>
+                <div className="flex justify-between items-center pt-2">
+                  <button onClick={() => setAuthMode('select')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-widest">
+                    {t.auth.backToOptions}
+                  </button>
+                  <button onClick={() => setAuthMode('email-login')} className="text-[10px] font-bold text-purple-500 hover:text-purple-600 uppercase tracking-widest">
+                    {t.auth.alreadyHaveAccount}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Pending Verification */}
+            {pendingVerification && (
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 mx-auto rounded-full bg-blue-500/10 flex items-center justify-center">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-500">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                  </svg>
+                </div>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">{t.auth.verificationSent}</p>
+                <button
+                  onClick={() => { resetAuthModal(); setAuthMode('email-login'); }}
+                  className="text-sm font-bold text-purple-500 hover:text-purple-600"
+                >
+                  {t.auth.loginButton}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
