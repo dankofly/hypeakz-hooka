@@ -3,6 +3,17 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { neon } from '@netlify/neon';
 import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import Stripe from 'stripe';
+
+// Stripe Setup
+const getStripe = (): Stripe | null => {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) return null;
+  return new Stripe(secretKey, { apiVersion: '2025-04-30.basil' });
+};
+
+const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || 'price_1StvVa037lod7PW0V0iiLRCe';
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 // Firebase Admin Singleton
 let firebaseAdminApp: App | null = null;
@@ -72,7 +83,7 @@ const ensureTables = async (sql: any) => {
   if (tablesInitPromise) return tablesInitPromise;
 
   tablesInitPromise = Promise.all([
-    sql`CREATE TABLE IF NOT EXISTS hypeakz_users (id TEXT PRIMARY KEY, name TEXT, brand TEXT, email TEXT, phone TEXT, created_at BIGINT, unlimited_status BOOLEAN DEFAULT FALSE, generation_count INT DEFAULT 0, paid BOOLEAN DEFAULT FALSE)`,
+    sql`CREATE TABLE IF NOT EXISTS hypeakz_users (id TEXT PRIMARY KEY, name TEXT, brand TEXT, email TEXT, phone TEXT, created_at BIGINT, unlimited_status BOOLEAN DEFAULT FALSE, generation_count INT DEFAULT 0, paid BOOLEAN DEFAULT FALSE, stripe_customer_id TEXT, stripe_subscription_id TEXT, subscription_status TEXT)`,
     sql`CREATE TABLE IF NOT EXISTS hypeakz_history (id TEXT PRIMARY KEY, timestamp BIGINT, brief JSONB, concepts JSONB)`,
     sql`CREATE TABLE IF NOT EXISTS hypeakz_profiles (id TEXT PRIMARY KEY, name TEXT, brief JSONB)`,
     sql`CREATE TABLE IF NOT EXISTS hypeakz_analytics (id TEXT PRIMARY KEY, event_name TEXT, timestamp BIGINT, metadata JSONB)`,
@@ -379,6 +390,175 @@ export const handler = async (event: any) => {
         const { userId } = payload;
         if (!userId) break;
         await sql`UPDATE hypeakz_users SET generation_count = COALESCE(generation_count, 0) + 1 WHERE id = ${userId}`;
+        break;
+      }
+
+      // --- STRIPE CHECKOUT ---
+      case 'create-checkout-session': {
+        const stripe = getStripe();
+        if (!stripe) {
+          result = { error: 'Stripe not configured' };
+          break;
+        }
+
+        const { userId, email } = payload;
+        if (!userId || !email) {
+          result = { error: 'Missing userId or email' };
+          break;
+        }
+
+        // Get or create Stripe customer
+        let customerId: string;
+        if (sql) {
+          await ensureTables(sql);
+          const userRows = await sql`SELECT stripe_customer_id FROM hypeakz_users WHERE id = ${userId} LIMIT 1`;
+          if (userRows.length > 0 && userRows[0].stripe_customer_id) {
+            customerId = userRows[0].stripe_customer_id;
+          } else {
+            // Create new Stripe customer
+            const customer = await stripe.customers.create({
+              email: email,
+              metadata: { userId: userId }
+            });
+            customerId = customer.id;
+            // Save customer ID to database
+            await sql`UPDATE hypeakz_users SET stripe_customer_id = ${customerId} WHERE id = ${userId}`;
+          }
+        } else {
+          // No DB - create customer without saving
+          const customer = await stripe.customers.create({
+            email: email,
+            metadata: { userId: userId }
+          });
+          customerId = customer.id;
+        }
+
+        // Create checkout session
+        const baseUrl = process.env.URL || 'https://hypeakz-hooka.netlify.app';
+        const session = await stripe.checkout.sessions.create({
+          customer: customerId,
+          payment_method_types: ['card'],
+          line_items: [{
+            price: STRIPE_PRICE_ID,
+            quantity: 1
+          }],
+          mode: 'subscription',
+          success_url: `${baseUrl}?checkout=success`,
+          cancel_url: `${baseUrl}?checkout=cancelled`,
+          metadata: {
+            userId: userId
+          },
+          subscription_data: {
+            metadata: {
+              userId: userId
+            }
+          }
+        });
+
+        result = { url: session.url };
+        break;
+      }
+
+      // --- STRIPE WEBHOOK ---
+      case 'stripe-webhook': {
+        const stripe = getStripe();
+        if (!stripe || !sql) {
+          return { statusCode: 400, headers, body: 'Stripe or DB not configured' };
+        }
+
+        // Verify webhook signature
+        const sig = event.headers['stripe-signature'];
+        if (!sig || !STRIPE_WEBHOOK_SECRET) {
+          console.error('Missing stripe signature or webhook secret');
+          return { statusCode: 400, headers, body: 'Missing signature' };
+        }
+
+        let stripeEvent: Stripe.Event;
+        try {
+          stripeEvent = stripe.webhooks.constructEvent(
+            event.body,
+            sig,
+            STRIPE_WEBHOOK_SECRET
+          );
+        } catch (err: any) {
+          console.error('Webhook signature verification failed:', err.message);
+          return { statusCode: 400, headers, body: `Webhook Error: ${err.message}` };
+        }
+
+        await ensureTables(sql);
+
+        // Handle the event
+        switch (stripeEvent.type) {
+          case 'checkout.session.completed': {
+            const session = stripeEvent.data.object as Stripe.Checkout.Session;
+            const userId = session.metadata?.userId;
+            const subscriptionId = session.subscription as string;
+            const customerId = session.customer as string;
+
+            if (userId && subscriptionId) {
+              await sql`UPDATE hypeakz_users SET
+                unlimited_status = true,
+                paid = true,
+                stripe_subscription_id = ${subscriptionId},
+                stripe_customer_id = ${customerId},
+                subscription_status = 'active'
+                WHERE id = ${userId}`;
+              console.log(`User ${userId} upgraded to premium via checkout`);
+            }
+            break;
+          }
+
+          case 'customer.subscription.updated': {
+            const subscription = stripeEvent.data.object as Stripe.Subscription;
+            const userId = subscription.metadata?.userId;
+            const status = subscription.status;
+
+            if (userId) {
+              const isActive = status === 'active' || status === 'trialing';
+              await sql`UPDATE hypeakz_users SET
+                unlimited_status = ${isActive},
+                paid = ${isActive},
+                subscription_status = ${status}
+                WHERE id = ${userId}`;
+              console.log(`User ${userId} subscription updated: ${status}`);
+            }
+            break;
+          }
+
+          case 'customer.subscription.deleted': {
+            const subscription = stripeEvent.data.object as Stripe.Subscription;
+            const userId = subscription.metadata?.userId;
+
+            if (userId) {
+              await sql`UPDATE hypeakz_users SET
+                unlimited_status = false,
+                paid = false,
+                subscription_status = 'cancelled'
+                WHERE id = ${userId}`;
+              console.log(`User ${userId} subscription cancelled`);
+            }
+            break;
+          }
+
+          case 'invoice.payment_failed': {
+            const invoice = stripeEvent.data.object as Stripe.Invoice;
+            const subscriptionId = invoice.subscription as string;
+
+            if (subscriptionId) {
+              // Find user by subscription ID and mark as payment failed
+              await sql`UPDATE hypeakz_users SET
+                subscription_status = 'payment_failed'
+                WHERE stripe_subscription_id = ${subscriptionId}`;
+              console.log(`Payment failed for subscription ${subscriptionId}`);
+            }
+            break;
+          }
+
+          default:
+            console.log(`Unhandled event type: ${stripeEvent.type}`);
+        }
+
+        result = { received: true };
         break;
       }
 

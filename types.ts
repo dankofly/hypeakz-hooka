@@ -8,6 +8,11 @@ export interface UserProfile {
   createdAt: number;
   emailVerified?: boolean;
   unlimitedStatus?: boolean;
+  generationCount?: number;
+  paid?: boolean;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  subscriptionStatus?: 'active' | 'cancelled' | 'payment_failed' | 'trialing' | null;
 }
 
 export interface NeuroScores {

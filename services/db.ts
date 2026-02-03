@@ -181,8 +181,18 @@ export const db = {
   },
 
   async createCheckoutSession(userId: string, email: string): Promise<string | null> {
-    // Placeholder for Stripe integration - contact support for premium access
-    console.log('Checkout requested for:', userId, email);
-    return null;
+    try {
+      const response = await callApi('create-checkout-session', { userId, email });
+      if (response && response.url) {
+        return response.url;
+      }
+      if (response && response.error) {
+        console.error('Checkout error:', response.error);
+      }
+      return null;
+    } catch (error) {
+      console.error('Checkout session creation failed:', error);
+      return null;
+    }
   }
 };
