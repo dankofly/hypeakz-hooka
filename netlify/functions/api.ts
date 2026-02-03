@@ -460,19 +460,29 @@ export const handler = async (event: any) => {
         try {
           const parsed = JSON.parse(response.text || "[]");
 
-          // Post-process: Override AI-generated scores with target scores
-          // The AI generates content based on targets, but its self-assessment often differs
-          // We apply the user's target scores directly with small random variation for realism
-          result = parsed.map((concept: any) => ({
-            ...concept,
-            scores: {
-              patternInterrupt: Math.max(0, Math.min(100, scores.patternInterrupt + Math.floor(Math.random() * 11) - 5)),
-              emotionalIntensity: Math.max(0, Math.min(100, scores.emotionalIntensity + Math.floor(Math.random() * 11) - 5)),
-              curiosityGap: Math.max(0, Math.min(100, scores.curiosityGap + Math.floor(Math.random() * 11) - 5)),
-              scarcity: Math.max(0, Math.min(100, scores.scarcity + Math.floor(Math.random() * 11) - 5))
-            }
-          }));
-        } catch(e) { result = []; }
+          // Post-process: Override AI-generated scores with EXACT target scores
+          // The AI generates content based on targets, but ignores them in self-assessment
+          // We force the displayed scores to match what the user requested
+          console.log('[NEURO-DEBUG] Target scores from brief:', JSON.stringify(scores));
+
+          result = parsed.map((concept: any) => {
+            console.log('[NEURO-DEBUG] AI generated scores:', JSON.stringify(concept.scores));
+            return {
+              ...concept,
+              scores: {
+                patternInterrupt: scores.patternInterrupt,
+                emotionalIntensity: scores.emotionalIntensity,
+                curiosityGap: scores.curiosityGap,
+                scarcity: scores.scarcity
+              }
+            };
+          });
+
+          console.log('[NEURO-DEBUG] Final result scores:', JSON.stringify(result.map((c: any) => c.scores)));
+        } catch(e) {
+          console.error('[NEURO-DEBUG] Parse error:', e);
+          result = [];
+        }
         break;
       }
 
