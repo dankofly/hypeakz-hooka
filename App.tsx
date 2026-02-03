@@ -716,7 +716,10 @@ const App: React.FC = () => {
       )}
 
       <footer className="max-w-7xl mx-auto px-6 py-12 md:py-24 border-t border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row justify-between items-center gap-6 md:gap-10">
-        <p className="text-[9px] md:text-[10px] font-black text-zinc-400 dark:text-zinc-600 uppercase tracking-[0.3em] antialiased text-center md:text-left">{t.company.copyright}</p>
+        <div className="flex items-center gap-4">
+          <p className="text-[9px] md:text-[10px] font-black text-zinc-400 dark:text-zinc-600 uppercase tracking-[0.3em] antialiased text-center md:text-left">{t.company.copyright}</p>
+          <span className="text-[8px] md:text-[9px] font-bold text-zinc-300 dark:text-zinc-700 uppercase tracking-[0.2em]">V1.0</span>
+        </div>
         <div className="flex gap-8 md:gap-12">
           <button onClick={() => setIsImpressumOpen(true)} className="text-[9px] md:text-[10px] font-black text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors uppercase tracking-[0.2em] antialiased">{t.nav.impressum}</button>
           <button onClick={() => setIsPrivacyOpen(true)} className="text-[9px] md:text-[10px] font-black text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors uppercase tracking-[0.2em] antialiased">{t.nav.privacy}</button>
