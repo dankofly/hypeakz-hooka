@@ -28,6 +28,7 @@ const firebaseUserToProfile = (user: User): UserProfile => {
 
 // Get Firebase ID token for API verification
 export const getIdToken = async (): Promise<string | null> => {
+  if (!auth) return null;
   const user = auth.currentUser;
   if (!user) return null;
   return user.getIdToken();
@@ -36,6 +37,9 @@ export const getIdToken = async (): Promise<string | null> => {
 export const authService = {
   // Google OAuth Login
   async signInWithGoogle(): Promise<UserProfile> {
+    if (!auth || !googleProvider) {
+      throw { code: 'auth/not-configured', message: 'Firebase not configured' };
+    }
     analytics.track('sso_start', { provider: 'google' });
 
     try {
@@ -58,6 +62,9 @@ export const authService = {
 
   // Email/Password Registration with Email Verification
   async registerWithEmail(email: string, password: string): Promise<{ user: UserProfile; needsVerification: boolean }> {
+    if (!auth) {
+      throw { code: 'auth/not-configured', message: 'Firebase not configured' };
+    }
     analytics.track('register_start', { provider: 'email' });
 
     try {
@@ -86,6 +93,9 @@ export const authService = {
 
   // Email/Password Login (requires verified email)
   async signInWithEmail(email: string, password: string): Promise<UserProfile> {
+    if (!auth) {
+      throw { code: 'auth/not-configured', message: 'Firebase not configured' };
+    }
     analytics.track('login_start', { provider: 'email' });
 
     try {
@@ -115,6 +125,7 @@ export const authService = {
 
   // Resend verification email
   async resendVerificationEmail(): Promise<void> {
+    if (!auth) return;
     const user = auth.currentUser;
     if (user && !user.emailVerified) {
       await sendEmailVerification(user);
@@ -123,17 +134,20 @@ export const authService = {
 
   // Check if current user's email is verified
   isEmailVerified(): boolean {
+    if (!auth) return false;
     return auth.currentUser?.emailVerified ?? false;
   },
 
   // Logout
   async logout(): Promise<void> {
+    if (!auth) return;
     await signOut(auth);
     analytics.track('logout');
   },
 
   // Get current user
   getCurrentUser(): UserProfile | null {
+    if (!auth) return null;
     const user = auth.currentUser;
     if (!user) return null;
     return firebaseUserToProfile(user);

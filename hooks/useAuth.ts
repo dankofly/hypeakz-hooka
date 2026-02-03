@@ -18,6 +18,17 @@ export const useAuth = () => {
   });
 
   useEffect(() => {
+    // If Firebase is not configured, skip auth state listener
+    if (!auth) {
+      setAuthState({
+        user: null,
+        firebaseUser: null,
+        loading: false,
+        emailVerified: false
+      });
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const profile: UserProfile = {
