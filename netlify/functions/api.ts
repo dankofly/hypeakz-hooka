@@ -82,14 +82,28 @@ let tablesInitPromise: Promise<any> | null = null;
 const ensureTables = async (sql: any) => {
   if (tablesInitPromise) return tablesInitPromise;
 
-  tablesInitPromise = Promise.all([
-    sql`CREATE TABLE IF NOT EXISTS hypeakz_users (id TEXT PRIMARY KEY, name TEXT, brand TEXT, email TEXT, phone TEXT, created_at BIGINT, unlimited_status BOOLEAN DEFAULT FALSE, generation_count INT DEFAULT 0, paid BOOLEAN DEFAULT FALSE, stripe_customer_id TEXT, stripe_subscription_id TEXT, subscription_status TEXT)`,
-    sql`CREATE TABLE IF NOT EXISTS hypeakz_history (id TEXT PRIMARY KEY, timestamp BIGINT, brief JSONB, concepts JSONB)`,
-    sql`CREATE TABLE IF NOT EXISTS hypeakz_profiles (id TEXT PRIMARY KEY, name TEXT, brief JSONB)`,
-    sql`CREATE TABLE IF NOT EXISTS hypeakz_analytics (id TEXT PRIMARY KEY, event_name TEXT, timestamp BIGINT, metadata JSONB)`,
-    sql`CREATE TABLE IF NOT EXISTS hypeakz_settings (key TEXT PRIMARY KEY, value TEXT)`,
-    sql`CREATE TABLE IF NOT EXISTS hypeakz_promo_codes (id TEXT PRIMARY KEY, code TEXT UNIQUE NOT NULL, created_at BIGINT, used_by TEXT, used_at BIGINT)`
-  ]).catch(e => {
+  tablesInitPromise = (async () => {
+    // Create tables if they don't exist
+    await Promise.all([
+      sql`CREATE TABLE IF NOT EXISTS hypeakz_users (id TEXT PRIMARY KEY, name TEXT, brand TEXT, email TEXT, phone TEXT, created_at BIGINT, unlimited_status BOOLEAN DEFAULT FALSE, generation_count INT DEFAULT 0)`,
+      sql`CREATE TABLE IF NOT EXISTS hypeakz_history (id TEXT PRIMARY KEY, timestamp BIGINT, brief JSONB, concepts JSONB)`,
+      sql`CREATE TABLE IF NOT EXISTS hypeakz_profiles (id TEXT PRIMARY KEY, name TEXT, brief JSONB)`,
+      sql`CREATE TABLE IF NOT EXISTS hypeakz_analytics (id TEXT PRIMARY KEY, event_name TEXT, timestamp BIGINT, metadata JSONB)`,
+      sql`CREATE TABLE IF NOT EXISTS hypeakz_settings (key TEXT PRIMARY KEY, value TEXT)`,
+      sql`CREATE TABLE IF NOT EXISTS hypeakz_promo_codes (id TEXT PRIMARY KEY, code TEXT UNIQUE NOT NULL, created_at BIGINT, used_by TEXT, used_at BIGINT)`
+    ]);
+
+    // Add Stripe columns if they don't exist (migration for existing tables)
+    await Promise.all([
+      sql`ALTER TABLE hypeakz_users ADD COLUMN IF NOT EXISTS paid BOOLEAN DEFAULT FALSE`,
+      sql`ALTER TABLE hypeakz_users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`,
+      sql`ALTER TABLE hypeakz_users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT`,
+      sql`ALTER TABLE hypeakz_users ADD COLUMN IF NOT EXISTS subscription_status TEXT`
+    ]).catch(e => {
+      // Ignore errors if columns already exist (some PostgreSQL versions don't support IF NOT EXISTS)
+      console.log('Column migration note:', e.message);
+    });
+  })().catch(e => {
     console.error("Table init error:", e);
     tablesInitPromise = null;
   });
