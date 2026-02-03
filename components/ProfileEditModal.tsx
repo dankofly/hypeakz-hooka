@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile, TranslationObject } from '../types.ts';
+import { validatePromoCode } from '../services/gemini.ts';
 
 interface ProfileEditModalProps {
   user: UserProfile;
@@ -7,9 +8,6 @@ interface ProfileEditModalProps {
   onSave: (updatedUser: UserProfile) => Promise<void>;
   t: TranslationObject;
 }
-
-// Valid promo codes for unlimited access
-const VALID_PROMO_CODES = ['hooka007unlim'];
 
 export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ user, onClose, onSave, t }) => {
   const [name, setName] = useState(user.name);
@@ -21,18 +19,32 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ user, onClos
 
   // Promo code state
   const [promoCode, setPromoCode] = useState('');
-  const [promoStatus, setPromoStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [promoStatus, setPromoStatus] = useState<'idle' | 'success' | 'error' | 'validating'>('idle');
+  const [promoError, setPromoError] = useState('');
   const [unlimitedStatus, setUnlimitedStatus] = useState(user.unlimitedStatus || false);
 
-  const handlePromoCodeSubmit = () => {
-    const code = promoCode.trim().toLowerCase();
-    if (VALID_PROMO_CODES.includes(code)) {
-      setUnlimitedStatus(true);
-      setPromoStatus('success');
-      setPromoCode('');
-    } else {
+  const handlePromoCodeSubmit = async () => {
+    if (!promoCode.trim()) return;
+
+    setPromoStatus('validating');
+    setPromoError('');
+
+    try {
+      const result = await validatePromoCode(promoCode.trim(), user.id);
+
+      if (result.valid) {
+        setUnlimitedStatus(true);
+        setPromoStatus('success');
+        setPromoCode('');
+      } else {
+        setPromoError(result.error || 'Invalid code');
+        setPromoStatus('error');
+        setTimeout(() => setPromoStatus('idle'), 3000);
+      }
+    } catch (err) {
+      setPromoError('Connection error');
       setPromoStatus('error');
-      setTimeout(() => setPromoStatus('idle'), 2000);
+      setTimeout(() => setPromoStatus('idle'), 3000);
     }
   };
 
@@ -206,7 +218,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ user, onClos
                             : 'border-zinc-200 dark:border-zinc-700 focus:border-purple-500'
                         }`}
                         placeholder="XXXX-XXXX"
-                        disabled={isSaving || isSuccess}
+                        disabled={isSaving || isSuccess || promoStatus === 'validating'}
                       />
                       {promoStatus === 'error' && (
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -220,10 +232,17 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ user, onClos
                     <button
                       type="button"
                       onClick={handlePromoCodeSubmit}
-                      disabled={!promoCode.trim() || isSaving || isSuccess}
-                      className="px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
+                      disabled={!promoCode.trim() || isSaving || isSuccess || promoStatus === 'validating'}
+                      className="px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 flex items-center gap-2"
                     >
-                      {t.profileEdit.promoCode?.activate || 'Activate'}
+                      {promoStatus === 'validating' ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>...</span>
+                        </>
+                      ) : (
+                        t.profileEdit.promoCode?.activate || 'Activate'
+                      )}
                     </button>
                   </div>
 
@@ -233,7 +252,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ user, onClos
                         <circle cx="12" cy="12" r="10"/>
                         <path d="M12 8v4M12 16h.01"/>
                       </svg>
-                      {t.profileEdit.promoCode?.invalid || 'Invalid promo code'}
+                      {promoError || t.profileEdit.promoCode?.invalid || 'Invalid promo code'}
                     </p>
                   )}
                   {promoStatus === 'success' && (

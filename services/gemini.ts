@@ -82,3 +82,53 @@ export const getAdminPrompt = async (): Promise<string> => {
 export const saveAdminPrompt = async (password: string, prompt: string): Promise<void> => {
   await callApi('save-admin-prompt', { password, prompt });
 };
+
+// --- ADMIN USER MANAGEMENT ---
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  brand: string;
+  createdAt: number;
+  unlimitedStatus: boolean;
+  generationCount: number;
+  paid: boolean;
+}
+
+export interface PromoCode {
+  id: string;
+  code: string;
+  createdAt: number;
+  usedBy: string | null;
+  usedAt: number | null;
+}
+
+export const getAdminUsers = async (password: string): Promise<AdminUser[]> => {
+  return callApi('admin-get-users', { password });
+};
+
+export const toggleUserPaid = async (password: string, userId: string): Promise<void> => {
+  await callApi('admin-toggle-paid', { password, userId });
+};
+
+export const toggleUserUnlimited = async (password: string, userId: string): Promise<void> => {
+  await callApi('admin-toggle-unlimited', { password, userId });
+};
+
+export const generatePromoCode = async (password: string): Promise<string> => {
+  const result = await callApi('admin-generate-promo', { password });
+  return result.code;
+};
+
+export const getPromoCodes = async (password: string): Promise<PromoCode[]> => {
+  return callApi('admin-get-promo-codes', { password });
+};
+
+export const validatePromoCode = async (code: string, userId: string): Promise<{ valid: boolean; error?: string; unlimited?: boolean }> => {
+  return callApi('validate-promo-code', { code, userId });
+};
+
+export const incrementGeneration = async (userId: string): Promise<void> => {
+  await callApi('increment-generation', { userId });
+};

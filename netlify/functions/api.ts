@@ -72,17 +72,28 @@ const ensureTables = async (sql: any) => {
   if (tablesInitPromise) return tablesInitPromise;
 
   tablesInitPromise = Promise.all([
-    sql`CREATE TABLE IF NOT EXISTS hypeakz_users (id TEXT PRIMARY KEY, name TEXT, brand TEXT, email TEXT, phone TEXT, created_at BIGINT)`,
+    sql`CREATE TABLE IF NOT EXISTS hypeakz_users (id TEXT PRIMARY KEY, name TEXT, brand TEXT, email TEXT, phone TEXT, created_at BIGINT, unlimited_status BOOLEAN DEFAULT FALSE, generation_count INT DEFAULT 0, paid BOOLEAN DEFAULT FALSE)`,
     sql`CREATE TABLE IF NOT EXISTS hypeakz_history (id TEXT PRIMARY KEY, timestamp BIGINT, brief JSONB, concepts JSONB)`,
     sql`CREATE TABLE IF NOT EXISTS hypeakz_profiles (id TEXT PRIMARY KEY, name TEXT, brief JSONB)`,
     sql`CREATE TABLE IF NOT EXISTS hypeakz_analytics (id TEXT PRIMARY KEY, event_name TEXT, timestamp BIGINT, metadata JSONB)`,
-    sql`CREATE TABLE IF NOT EXISTS hypeakz_settings (key TEXT PRIMARY KEY, value TEXT)`
+    sql`CREATE TABLE IF NOT EXISTS hypeakz_settings (key TEXT PRIMARY KEY, value TEXT)`,
+    sql`CREATE TABLE IF NOT EXISTS hypeakz_promo_codes (id TEXT PRIMARY KEY, code TEXT UNIQUE NOT NULL, created_at BIGINT, used_by TEXT, used_at BIGINT)`
   ]).catch(e => {
     console.error("Table init error:", e);
     tablesInitPromise = null;
   });
 
   return tablesInitPromise;
+};
+
+// Helper: Generate unique promo code
+const generatePromoCode = (): string => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'HYPEAKZ-';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
 };
 
 const fetchUrlContent = async (targetUrl: string): Promise<string | null> => {
@@ -185,15 +196,17 @@ export const handler = async (event: any) => {
       case 'save-user': {
         if (!sql) break;
         const u = payload;
-        if (!u.id || !u.name) break; 
-        await sql`INSERT INTO hypeakz_users (id, name, brand, email, phone, created_at) VALUES (${u.id}, ${u.name}, ${u.brand}, ${u.email}, ${u.phone || null}, ${u.createdAt}) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, brand = EXCLUDED.brand, email = EXCLUDED.email, phone = EXCLUDED.phone`;
+        if (!u.id || !u.name) break;
+        await ensureTables(sql);
+        await sql`INSERT INTO hypeakz_users (id, name, brand, email, phone, created_at, unlimited_status) VALUES (${u.id}, ${u.name}, ${u.brand}, ${u.email}, ${u.phone || null}, ${u.createdAt}, ${u.unlimitedStatus || false}) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, brand = EXCLUDED.brand, email = EXCLUDED.email, phone = EXCLUDED.phone, unlimited_status = EXCLUDED.unlimited_status`;
         break;
       }
       case 'get-user': {
         if (!sql) { result = null; break; }
+        await ensureTables(sql);
         const rows = await sql`SELECT * FROM hypeakz_users WHERE id = ${payload.id} LIMIT 1`;
         result = rows.length === 0 ? null : {
-          id: rows[0].id, name: rows[0].name, brand: rows[0].brand, email: rows[0].email, phone: rows[0].phone, createdAt: Number(rows[0].created_at)
+          id: rows[0].id, name: rows[0].name, brand: rows[0].brand, email: rows[0].email, phone: rows[0].phone, createdAt: Number(rows[0].created_at), unlimitedStatus: rows[0].unlimited_status || false, generationCount: rows[0].generation_count || 0
         };
         break;
       }
@@ -258,6 +271,114 @@ export const handler = async (event: any) => {
         if (!sql) throw new Error("No Database");
         await sql`INSERT INTO hypeakz_settings (key, value) VALUES ('system_prompt', ${payload.prompt}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`;
         result = { success: true };
+        break;
+      }
+
+      // --- ADMIN USER MANAGEMENT ---
+      case 'admin-get-users': {
+        if (payload.password !== ADMIN_PASS) return { statusCode: 401, headers, body: JSON.stringify({ error: "Unauthorized" }) };
+        if (!sql) { result = []; break; }
+        await ensureTables(sql);
+        const users = await sql`SELECT id, name, email, brand, created_at, unlimited_status, generation_count, paid FROM hypeakz_users ORDER BY created_at DESC`;
+        result = users.map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          brand: u.brand,
+          createdAt: Number(u.created_at),
+          unlimitedStatus: u.unlimited_status || false,
+          generationCount: u.generation_count || 0,
+          paid: u.paid || false
+        }));
+        break;
+      }
+
+      case 'admin-toggle-paid': {
+        if (payload.password !== ADMIN_PASS) return { statusCode: 401, headers, body: JSON.stringify({ error: "Unauthorized" }) };
+        if (!sql) throw new Error("No Database");
+        await sql`UPDATE hypeakz_users SET paid = NOT COALESCE(paid, false) WHERE id = ${payload.userId}`;
+        result = { success: true };
+        break;
+      }
+
+      case 'admin-toggle-unlimited': {
+        if (payload.password !== ADMIN_PASS) return { statusCode: 401, headers, body: JSON.stringify({ error: "Unauthorized" }) };
+        if (!sql) throw new Error("No Database");
+        await sql`UPDATE hypeakz_users SET unlimited_status = NOT COALESCE(unlimited_status, false) WHERE id = ${payload.userId}`;
+        result = { success: true };
+        break;
+      }
+
+      // --- PROMO CODE MANAGEMENT ---
+      case 'admin-generate-promo': {
+        if (payload.password !== ADMIN_PASS) return { statusCode: 401, headers, body: JSON.stringify({ error: "Unauthorized" }) };
+        if (!sql) throw new Error("No Database");
+        await ensureTables(sql);
+
+        const code = generatePromoCode();
+        const id = Date.now().toString() + Math.random().toString(36).substring(7);
+        await sql`INSERT INTO hypeakz_promo_codes (id, code, created_at) VALUES (${id}, ${code}, ${Date.now()})`;
+        result = { code };
+        break;
+      }
+
+      case 'admin-get-promo-codes': {
+        if (payload.password !== ADMIN_PASS) return { statusCode: 401, headers, body: JSON.stringify({ error: "Unauthorized" }) };
+        if (!sql) { result = []; break; }
+        await ensureTables(sql);
+        const codes = await sql`SELECT id, code, created_at, used_by, used_at FROM hypeakz_promo_codes ORDER BY created_at DESC`;
+        result = codes.map((c: any) => ({
+          id: c.id,
+          code: c.code,
+          createdAt: Number(c.created_at),
+          usedBy: c.used_by || null,
+          usedAt: c.used_at ? Number(c.used_at) : null
+        }));
+        break;
+      }
+
+      case 'validate-promo-code': {
+        if (!sql) { result = { valid: false, error: 'No database' }; break; }
+        await ensureTables(sql);
+
+        const { code, userId } = payload;
+        if (!code || !userId) { result = { valid: false, error: 'Missing data' }; break; }
+
+        // Check if code exists and is not used
+        const codeRows = await sql`SELECT * FROM hypeakz_promo_codes WHERE LOWER(code) = LOWER(${code.trim()}) LIMIT 1`;
+
+        if (codeRows.length === 0) {
+          // Also check for the hardcoded legacy code
+          if (code.trim().toLowerCase() === 'hooka007unlim') {
+            // Legacy code - always valid, activate unlimited
+            await sql`UPDATE hypeakz_users SET unlimited_status = true WHERE id = ${userId}`;
+            result = { valid: true, unlimited: true };
+          } else {
+            result = { valid: false, error: 'Invalid code' };
+          }
+          break;
+        }
+
+        const promoCode = codeRows[0];
+
+        if (promoCode.used_by) {
+          result = { valid: false, error: 'Code already used' };
+          break;
+        }
+
+        // Mark code as used and activate unlimited for user
+        await sql`UPDATE hypeakz_promo_codes SET used_by = ${userId}, used_at = ${Date.now()} WHERE id = ${promoCode.id}`;
+        await sql`UPDATE hypeakz_users SET unlimited_status = true WHERE id = ${userId}`;
+
+        result = { valid: true, unlimited: true };
+        break;
+      }
+
+      case 'increment-generation': {
+        if (!sql) break;
+        const { userId } = payload;
+        if (!userId) break;
+        await sql`UPDATE hypeakz_users SET generation_count = COALESCE(generation_count, 0) + 1 WHERE id = ${userId}`;
         break;
       }
 
