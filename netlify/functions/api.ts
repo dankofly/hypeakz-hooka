@@ -9,7 +9,7 @@ import Stripe from 'stripe';
 const getStripe = (): Stripe | null => {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) return null;
-  return new Stripe(secretKey, { apiVersion: '2025-04-30.basil' });
+  return new Stripe(secretKey);
 };
 
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || 'price_1StvVa037lod7PW0V0iiLRCe';
@@ -434,7 +434,7 @@ export const handler = async (event: any) => {
         }
 
         // Create checkout session
-        const baseUrl = process.env.URL || 'https://hypeakz-hooka.netlify.app';
+        const baseUrl = process.env.URL || 'https://hooka.hypeakz.io';
         const session = await stripe.checkout.sessions.create({
           customer: customerId,
           payment_method_types: ['card'],
@@ -541,8 +541,10 @@ export const handler = async (event: any) => {
           }
 
           case 'invoice.payment_failed': {
-            const invoice = stripeEvent.data.object as Stripe.Invoice;
-            const subscriptionId = invoice.subscription as string;
+            const invoice = stripeEvent.data.object as any;
+            const subscriptionId = typeof invoice.subscription === 'string'
+              ? invoice.subscription
+              : invoice.subscription?.id || invoice.parent?.subscription_details?.subscription;
 
             if (subscriptionId) {
               // Find user by subscription ID and mark as payment failed

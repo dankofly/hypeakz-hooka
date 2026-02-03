@@ -5,7 +5,7 @@ import { neon } from '@netlify/neon';
 const getStripe = (): Stripe | null => {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) return null;
-  return new Stripe(secretKey, { apiVersion: '2025-04-30.basil' });
+  return new Stripe(secretKey);
 };
 
 const getSql = () => {
@@ -144,8 +144,10 @@ export const handler = async (event: any) => {
       }
 
       case 'invoice.payment_failed': {
-        const invoice = stripeEvent.data.object as Stripe.Invoice;
-        const subscriptionId = invoice.subscription as string;
+        const invoice = stripeEvent.data.object as any;
+        const subscriptionId = typeof invoice.subscription === 'string'
+          ? invoice.subscription
+          : invoice.subscription?.id || invoice.parent?.subscription_details?.subscription;
 
         console.log(`Payment failed for subscription ${subscriptionId}`);
 
@@ -158,8 +160,10 @@ export const handler = async (event: any) => {
       }
 
       case 'invoice.paid': {
-        const invoice = stripeEvent.data.object as Stripe.Invoice;
-        const subscriptionId = invoice.subscription as string;
+        const invoice = stripeEvent.data.object as any;
+        const subscriptionId = typeof invoice.subscription === 'string'
+          ? invoice.subscription
+          : invoice.subscription?.id || invoice.parent?.subscription_details?.subscription;
 
         console.log(`Invoice paid for subscription ${subscriptionId}`);
 
