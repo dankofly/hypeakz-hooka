@@ -8,6 +8,9 @@ interface ProfileEditModalProps {
   t: TranslationObject;
 }
 
+// Valid promo codes for unlimited access
+const VALID_PROMO_CODES = ['hooka007unlim'];
+
 export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ user, onClose, onSave, t }) => {
   const [name, setName] = useState(user.name);
   const [brand, setBrand] = useState(user.brand || '');
@@ -15,6 +18,23 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ user, onClos
   const [phone, setPhone] = useState(user.phone || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  // Promo code state
+  const [promoCode, setPromoCode] = useState('');
+  const [promoStatus, setPromoStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [unlimitedStatus, setUnlimitedStatus] = useState(user.unlimitedStatus || false);
+
+  const handlePromoCodeSubmit = () => {
+    const code = promoCode.trim().toLowerCase();
+    if (VALID_PROMO_CODES.includes(code)) {
+      setUnlimitedStatus(true);
+      setPromoStatus('success');
+      setPromoCode('');
+    } else {
+      setPromoStatus('error');
+      setTimeout(() => setPromoStatus('idle'), 2000);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +45,8 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ user, onClos
         name,
         brand,
         email,
-        phone
+        phone,
+        unlimitedStatus
       });
       setIsSuccess(true);
       // Wait a moment for the success animation
@@ -115,6 +136,58 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ user, onClos
                     disabled={isSaving || isSuccess}
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* Promo Code Section */}
+            <div className="pt-4 md:pt-6 border-t border-zinc-200 dark:border-zinc-800">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className={labelClasses}>{t.profileEdit.promoCode?.label || 'Promo Code'}</label>
+                  {unlimitedStatus && (
+                    <span className="flex items-center gap-1.5 px-3 py-1 bg-green-500/10 border border-green-500/30 rounded-full text-[10px] font-black text-green-600 dark:text-green-400 uppercase tracking-widest">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6 9 17 4 12"/></svg>
+                      {t.profileEdit.promoCode?.unlimited || 'Unlimited'}
+                    </span>
+                  )}
+                </div>
+
+                {!unlimitedStatus ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handlePromoCodeSubmit())}
+                      className={`${inputClasses} flex-1 ${promoStatus === 'error' ? 'border-red-500 focus:border-red-500' : ''}`}
+                      placeholder={t.profileEdit.promoCode?.placeholder || 'Enter code...'}
+                      disabled={isSaving || isSuccess}
+                    />
+                    <button
+                      type="button"
+                      onClick={handlePromoCodeSubmit}
+                      disabled={!promoCode.trim() || isSaving || isSuccess}
+                      className="px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest bg-purple-600 text-white hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {t.profileEdit.promoCode?.activate || 'Activate'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-500 font-medium">
+                    {t.profileEdit.promoCode?.activeMessage || 'You have unlimited access to all features.'}
+                  </p>
+                )}
+
+                {promoStatus === 'error' && (
+                  <p className="text-xs text-red-500 font-bold animate-in fade-in duration-200">
+                    {t.profileEdit.promoCode?.invalid || 'Invalid promo code'}
+                  </p>
+                )}
+                {promoStatus === 'success' && (
+                  <p className="text-xs text-green-500 font-bold animate-in fade-in duration-200">
+                    {t.profileEdit.promoCode?.success || 'Promo code activated! Save to apply.'}
+                  </p>
+                )}
               </div>
             </div>
 

@@ -233,7 +233,16 @@ export const TRANSLATIONS = {
       cancel: "Cancel",
       save: "Sync Profile",
       saving: "Syncing...",
-      saved: "Synced"
+      saved: "Synced",
+      promoCode: {
+        label: "Promo Code",
+        placeholder: "Enter code...",
+        activate: "Activate",
+        unlimited: "Unlimited",
+        activeMessage: "You have unlimited access to all features.",
+        invalid: "Invalid promo code",
+        success: "Promo code activated! Save to apply."
+      }
     },
     legal: {
       consent: {
@@ -531,7 +540,16 @@ export const TRANSLATIONS = {
       cancel: "Abbrechen",
       save: "Profil Syncen",
       saving: "Syncing...",
-      saved: "Gesynced"
+      saved: "Gesynced",
+      promoCode: {
+        label: "Promo Code",
+        placeholder: "Code eingeben...",
+        activate: "Aktivieren",
+        unlimited: "Unlimited",
+        activeMessage: "Du hast unbegrenzten Zugang zu allen Features.",
+        invalid: "Ungültiger Promo Code",
+        success: "Promo Code aktiviert! Speichern um anzuwenden."
+      }
     },
     legal: {
       consent: {

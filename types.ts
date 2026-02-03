@@ -7,6 +7,7 @@ export interface UserProfile {
   phone?: string;
   createdAt: number;
   emailVerified?: boolean;
+  unlimitedStatus?: boolean;
 }
 
 export interface NeuroScores {
