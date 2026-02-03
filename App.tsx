@@ -94,7 +94,13 @@ const App: React.FC = () => {
     targetAudience: "",
     goal: "",
     speaker: "",
-    language: 'DE' // This controls the output generation language
+    language: 'DE', // This controls the output generation language
+    targetScores: {
+      patternInterrupt: 70,
+      emotionalIntensity: 70,
+      curiosityGap: 70,
+      scarcity: 50
+    }
   });
   
   // Current translation object based on APP language

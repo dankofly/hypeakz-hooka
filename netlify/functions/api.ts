@@ -391,20 +391,32 @@ export const handler = async (event: any) => {
           brief.triggerWords && brief.triggerWords.length > 0 ? `- Mandatory Trigger Words: ${brief.triggerWords.join(', ')}` : ''
         ].filter(Boolean).join('\n');
 
-        const prompt = `Erstelle 4 virale Video-Konzepte. 
-        Context: ${brief.productContext}. 
-        Goal: ${brief.goal}. 
+        // Helper to interpret score levels
+        const interpretScore = (score: number, metricName: string): string => {
+          if (score === 0) return `COMPLETELY AVOID ${metricName} - do NOT use this tactic at all`;
+          if (score <= 20) return `MINIMAL ${metricName} (${score}%) - barely noticeable, very subtle`;
+          if (score <= 40) return `LOW ${metricName} (${score}%) - light touch, understated`;
+          if (score <= 60) return `MODERATE ${metricName} (${score}%) - balanced approach`;
+          if (score <= 80) return `HIGH ${metricName} (${score}%) - strong presence`;
+          return `MAXIMUM ${metricName} (${score}%) - extremely aggressive, dominant`;
+        };
+
+        const prompt = `Erstelle 4 virale Video-Konzepte.
+        Context: ${brief.productContext}.
+        Goal: ${brief.goal}.
         Audience: ${brief.targetAudience}.
         Speaker Style: ${brief.speaker}.
-        
+
         NLP & STRUCTURAL CONSTRAINTS (Apply these strictly):
         ${nlpConstraints || "No specific NLP constraints selected. Optimize for maximum retention."}
 
-        TARGET NEURO METRICS (Aim for these levels in your script writing):
-        - Pattern Interrupt: ${scores.patternInterrupt}/100 (Shock factor, unexpected start)
-        - Emotional Intensity: ${scores.emotionalIntensity}/100 (Feeling depth)
-        - Curiosity Gap: ${scores.curiosityGap}/100 (Open loops)
-        - Scarcity/FOMO: ${scores.scarcity}/100 (Urgency)
+        MANDATORY NEURO METRIC CALIBRATION (STRICTLY FOLLOW THESE LEVELS - your output scores MUST match these targets):
+        1. ${interpretScore(scores.patternInterrupt, 'PATTERN INTERRUPT')} - Controls how shocking/unexpected the opening is
+        2. ${interpretScore(scores.emotionalIntensity, 'EMOTIONAL INTENSITY')} - Controls depth of feelings evoked
+        3. ${interpretScore(scores.curiosityGap, 'CURIOSITY GAP')} - Controls use of open loops and cliffhangers
+        4. ${interpretScore(scores.scarcity, 'SCARCITY/FOMO')} - Controls urgency and fear of missing out
+
+        IMPORTANT: Your generated scripts MUST reflect these exact metric levels. If a metric is 0%, do NOT use that tactic. If a metric is 100%, make it the dominant force in the script. The scores you return in your response should be within ±10% of these target values.
         `;
 
         const response = await ai.models.generateContent({
