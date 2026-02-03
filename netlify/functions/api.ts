@@ -94,22 +94,24 @@ const ensureTables = async (sql: any) => {
     ]);
 
     // Add Stripe columns if they don't exist (migration for existing tables)
-    // PostgreSQL 9.6+ supports ADD COLUMN IF NOT EXISTS
-    try {
-      await sql`ALTER TABLE hypeakz_users ADD COLUMN IF NOT EXISTS paid BOOLEAN DEFAULT FALSE`;
-    } catch (e: any) { if (!e.message?.includes('already exists')) console.log('Migration 1:', e.message); }
+    // Use function call syntax for DDL statements
+    const migrations = [
+      'ALTER TABLE hypeakz_users ADD COLUMN IF NOT EXISTS paid BOOLEAN DEFAULT FALSE',
+      'ALTER TABLE hypeakz_users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT',
+      'ALTER TABLE hypeakz_users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT',
+      'ALTER TABLE hypeakz_users ADD COLUMN IF NOT EXISTS subscription_status TEXT'
+    ];
 
-    try {
-      await sql`ALTER TABLE hypeakz_users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`;
-    } catch (e: any) { if (!e.message?.includes('already exists')) console.log('Migration 2:', e.message); }
-
-    try {
-      await sql`ALTER TABLE hypeakz_users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT`;
-    } catch (e: any) { if (!e.message?.includes('already exists')) console.log('Migration 3:', e.message); }
-
-    try {
-      await sql`ALTER TABLE hypeakz_users ADD COLUMN IF NOT EXISTS subscription_status TEXT`;
-    } catch (e: any) { if (!e.message?.includes('already exists')) console.log('Migration 4:', e.message); }
+    for (const migration of migrations) {
+      try {
+        await sql(migration);
+      } catch (e: any) {
+        // Ignore "already exists" errors, log others
+        if (!e.message?.includes('already exists')) {
+          console.log('Migration error:', e.message);
+        }
+      }
+    }
   })().catch(e => {
     console.error("Table init error:", e);
     tablesInitPromise = null;
