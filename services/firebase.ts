@@ -33,6 +33,10 @@ if (isFirebaseConfigured) {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     googleProvider = new GoogleAuthProvider();
+    // Configure Google provider for better UX
+    googleProvider.setCustomParameters({
+      prompt: 'select_account'
+    });
   } catch (error) {
     console.error('Firebase initialization failed:', error);
   }
@@ -41,11 +45,6 @@ if (isFirebaseConfigured) {
 }
 
 export { auth, googleProvider };
-
-// Configure Google provider for better UX
-googleProvider.setCustomParameters({
-  prompt: 'select_account'
-});
 
 export {
   signInWithPopup,
