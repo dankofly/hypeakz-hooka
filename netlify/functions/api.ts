@@ -212,7 +212,7 @@ export const handler = async (event: any) => {
       }
     }
 
-    if (sql && ['log-analytics', 'save-user', 'save-history', 'save-profile', 'save-admin-prompt', 'generate-hooks'].includes(action)) {
+    if (sql && ['log-analytics', 'save-user', 'save-history', 'save-profile', 'save-admin-prompt', 'generate-hooks', 'create-checkout-session'].includes(action)) {
       await ensureTables(sql);
     }
 
