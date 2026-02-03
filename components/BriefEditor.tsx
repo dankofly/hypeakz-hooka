@@ -67,7 +67,9 @@ export const BriefEditor: React.FC<BriefEditorProps> = ({ brief, onChange, disab
       curiosityGap: 70,
       scarcity: 50
     };
-    onChange('targetScores', { ...currentScores, [key]: value });
+    const newScores = { ...currentScores, [key]: value };
+    console.log('[SLIDER-DEBUG] Score changed:', key, '=', value, 'New scores:', newScores);
+    onChange('targetScores', newScores);
   };
 
   const toggleTriggerWord = (word: string) => {

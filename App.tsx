@@ -290,6 +290,11 @@ const App: React.FC = () => {
     setConcepts([]);
     setStatus(GenerationStatus.LOADING);
     setError(null);
+
+    // DEBUG: Log what's being sent to API
+    console.log('[FRONTEND-DEBUG] Brief being sent:', JSON.stringify(brief, null, 2));
+    console.log('[FRONTEND-DEBUG] targetScores:', brief.targetScores);
+
     try {
       const results = await generateViralHooks(brief);
       setConcepts(results);
