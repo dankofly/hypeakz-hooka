@@ -29,9 +29,9 @@ const storage = {
 };
 
 // Helper to call the API with Timeout and Auth Token
-const callApi = async (action: string, payload: any = {}) => {
+const callApi = async (action: string, payload: any = {}, timeoutMs: number = 5000) => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s Timeout
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     // Get Firebase token for authenticated requests
@@ -180,19 +180,28 @@ export const db = {
     await callApi('delete-profile', { id });
   },
 
-  async createCheckoutSession(userId: string, email: string): Promise<string | null> {
+  async createCheckoutSession(userId: string, email: string): Promise<{ url?: string; error?: string }> {
     try {
-      const response = await callApi('create-checkout-session', { userId, email });
-      if (response && response.url) {
-        return response.url;
+      // Use longer timeout (20s) for Stripe operations
+      const response = await callApi('create-checkout-session', { userId, email }, 20000);
+
+      if (!response) {
+        return { error: 'Server nicht erreichbar. Bitte versuche es später erneut.' };
       }
-      if (response && response.error) {
+
+      if (response.url) {
+        return { url: response.url };
+      }
+
+      if (response.error) {
         console.error('Checkout error:', response.error);
+        return { error: response.error };
       }
-      return null;
-    } catch (error) {
+
+      return { error: 'Unbekannter Fehler beim Checkout.' };
+    } catch (error: any) {
       console.error('Checkout session creation failed:', error);
-      return null;
+      return { error: error.message || 'Ein Fehler ist aufgetreten.' };
     }
   }
 };

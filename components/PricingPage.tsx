@@ -35,11 +35,11 @@ export const PricingPage: React.FC<PricingPageProps> = ({
     setError(null);
 
     try {
-      const checkoutUrl = await db.createCheckoutSession(user.id, user.email);
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
+      const result = await db.createCheckoutSession(user.id, user.email);
+      if (result.url) {
+        window.location.href = result.url;
       } else {
-        setError('Checkout konnte nicht gestartet werden. Bitte kontaktiere den Support.');
+        setError(result.error || 'Checkout konnte nicht gestartet werden. Bitte kontaktiere den Support.');
       }
     } catch (e: any) {
       console.error('Checkout error:', e);

@@ -37,12 +37,12 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     setError(null);
 
     try {
-      const checkoutUrl = await db.createCheckoutSession(user.id, user.email);
+      const result = await db.createCheckoutSession(user.id, user.email);
 
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
+      if (result.url) {
+        window.location.href = result.url;
       } else {
-        setError('Checkout konnte nicht gestartet werden. Bitte versuche es erneut.');
+        setError(result.error || 'Checkout konnte nicht gestartet werden. Bitte versuche es erneut.');
       }
     } catch (e: any) {
       console.error('Checkout error:', e);
