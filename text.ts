@@ -21,7 +21,8 @@ export const TRANSLATIONS = {
       logout: "Logout",
       vaultAccess: "Vault Access",
       impressum: "Impressum",
-      privacy: "Privacy"
+      privacy: "Privacy",
+      pricing: "Pricing"
     },
     hero: {
       badge: "Neuro-Hook Generator",
@@ -317,6 +318,43 @@ export const TRANSLATIONS = {
       wrongPassword: "Incorrect password",
       tooManyRequests: "Too many attempts. Please wait.",
       popupClosed: "Sign-in was cancelled"
+    },
+    pricing: {
+      navTitle: "Hooka Pricing",
+      title: "Pricing",
+      badge: "Simple Pricing",
+      headline: "Choose Your Plan",
+      subheadline: "Start free with 10 generations. Upgrade for unlimited access.",
+      freePlan: "Free",
+      premiumPlan: "Premium",
+      forever: "forever",
+      month: "month",
+      popular: "Popular",
+      ctaPremium: "Upgrade Now",
+      loginToUpgrade: "Login to Upgrade",
+      activeSubscription: "Active Subscription",
+      feature1Free: "10 Generations (Lifetime)",
+      feature2Free: "4 Hook Variants per Generation",
+      feature3Free: "All NLP Parameters",
+      feature4Free: "Brand Scanner",
+      feature1Premium: "Unlimited Generations",
+      feature2Premium: "4 Hook Variants per Generation",
+      feature3Premium: "All NLP Parameters",
+      feature4Premium: "Brand Scanner",
+      feature5Premium: "Priority Support",
+      feature6Premium: "Early Access to New Features",
+      faqTitle: "Frequently Asked Questions",
+      faq1Q: "What happens after 10 free generations?",
+      faq1A: "You can still view all generated hooks. For new generations, you need a Premium subscription.",
+      faq2Q: "Can I cancel anytime?",
+      faq2A: "Yes, you can cancel your subscription anytime. It will remain active until the end of the billing period.",
+      faq3Q: "Which payment methods are accepted?",
+      faq3A: "We accept all major credit cards via Stripe (Visa, Mastercard, American Express).",
+      questions: "Still have questions?"
+    },
+    quota: {
+      used: "used",
+      contactEmail: "mail@danielkofler.com"
     }
   },
 
@@ -328,7 +366,8 @@ export const TRANSLATIONS = {
       logout: "Abmelden",
       vaultAccess: "Vault Login",
       impressum: "Impressum",
-      privacy: "Datenschutz"
+      privacy: "Datenschutz",
+      pricing: "Preise"
     },
     hero: {
       badge: "Neuro-Hook Generator",
@@ -624,6 +663,43 @@ export const TRANSLATIONS = {
       wrongPassword: "Falsches Passwort",
       tooManyRequests: "Zu viele Versuche. Bitte warten.",
       popupClosed: "Anmeldung abgebrochen"
+    },
+    pricing: {
+      navTitle: "Hooka Preise",
+      title: "Preise",
+      badge: "Simple Preise",
+      headline: "Wähle deinen Plan",
+      subheadline: "Starte kostenlos mit 10 Generierungen. Upgrade für unbegrenzten Zugang.",
+      freePlan: "Free",
+      premiumPlan: "Premium",
+      forever: "für immer",
+      month: "Monat",
+      popular: "Beliebt",
+      ctaPremium: "Jetzt upgraden",
+      loginToUpgrade: "Einloggen zum Upgraden",
+      activeSubscription: "Aktives Abo",
+      feature1Free: "10 Generierungen (Lifetime)",
+      feature2Free: "4 Hook-Varianten pro Generation",
+      feature3Free: "Alle NLP-Parameter",
+      feature4Free: "Brand Scanner",
+      feature1Premium: "Unbegrenzte Generierungen",
+      feature2Premium: "4 Hook-Varianten pro Generation",
+      feature3Premium: "Alle NLP-Parameter",
+      feature4Premium: "Brand Scanner",
+      feature5Premium: "Prioritäts-Support",
+      feature6Premium: "Früher Zugang zu neuen Features",
+      faqTitle: "Häufige Fragen",
+      faq1Q: "Was passiert nach den 10 Gratis-Generierungen?",
+      faq1A: "Du kannst weiterhin alle generierten Hooks ansehen. Für neue Generierungen benötigst du ein Premium-Abo.",
+      faq2Q: "Kann ich jederzeit kündigen?",
+      faq2A: "Ja, du kannst dein Abo jederzeit kündigen. Es läuft dann zum Ende der Abrechnungsperiode aus.",
+      faq3Q: "Welche Zahlungsmethoden werden akzeptiert?",
+      faq3A: "Wir akzeptieren alle gängigen Kreditkarten über Stripe (Visa, Mastercard, American Express).",
+      questions: "Noch Fragen?"
+    },
+    quota: {
+      used: "verwendet",
+      contactEmail: "mail@danielkofler.com"
     }
   }
 };

@@ -178,5 +178,11 @@ export const db = {
   async deleteProfile(id: string) {
     localStore.deleteProfile(id);
     await callApi('delete-profile', { id });
+  },
+
+  async createCheckoutSession(userId: string, email: string): Promise<string | null> {
+    // Placeholder for Stripe integration - contact support for premium access
+    console.log('Checkout requested for:', userId, email);
+    return null;
   }
 };

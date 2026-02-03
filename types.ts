@@ -69,6 +69,12 @@ export interface BriefProfile {
   brief: MarketingBrief;
 }
 
+export interface UserQuota {
+  usedGenerations: number;
+  limit: number;
+  isPremium: boolean;
+}
+
 // Type placeholder for the translation object to avoid circular deps
 // In a stricter setup, we would define the full schema here.
 export type TranslationObject = any;

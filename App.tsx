@@ -15,6 +15,7 @@ import { PrivacyPolicyModal } from './components/PrivacyPolicyModal.tsx';
 import { ConsentBanner } from './components/ConsentBanner.tsx';
 import { ProfileEditModal } from './components/ProfileEditModal.tsx';
 import { AdminModal } from './components/AdminModal.tsx';
+import { PricingPage } from './components/PricingPage.tsx';
 import { TRANSLATIONS } from './text.ts';
 
 // Helper for Firebase error messages
@@ -116,6 +117,7 @@ const App: React.FC = () => {
   const [isImpressumOpen, setIsImpressumOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isPricingOpen, setIsPricingOpen] = useState(false);
 
   // Sync Firebase user with local state
   useEffect(() => {
@@ -362,6 +364,13 @@ const App: React.FC = () => {
                 </button>
               ))}
             </div>
+
+            <button
+              onClick={() => setIsPricingOpen(true)}
+              className="hidden md:block text-[10px] font-black text-zinc-500 hover:text-purple-600 dark:hover:text-purple-400 uppercase tracking-widest transition-colors"
+            >
+              {t.nav.pricing}
+            </button>
 
             <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800 hidden md:block"></div>
 
@@ -721,6 +730,7 @@ const App: React.FC = () => {
           <span className="text-[8px] md:text-[9px] font-bold text-zinc-300 dark:text-zinc-700 uppercase tracking-[0.2em]">V1.0</span>
         </div>
         <div className="flex gap-8 md:gap-12">
+          <button onClick={() => setIsPricingOpen(true)} className="text-[9px] md:text-[10px] font-black text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors uppercase tracking-[0.2em] antialiased">{t.nav.pricing}</button>
           <button onClick={() => setIsImpressumOpen(true)} className="text-[9px] md:text-[10px] font-black text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors uppercase tracking-[0.2em] antialiased">{t.nav.impressum}</button>
           <button onClick={() => setIsPrivacyOpen(true)} className="text-[9px] md:text-[10px] font-black text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors uppercase tracking-[0.2em] antialiased">{t.nav.privacy}</button>
           {/* Secret Admin Button */}
@@ -732,6 +742,14 @@ const App: React.FC = () => {
       <ImpressumModal isOpen={isImpressumOpen} t={t} onClose={() => setIsImpressumOpen(false)} />
       <PrivacyPolicyModal isOpen={isPrivacyOpen} t={t} onClose={() => setIsPrivacyOpen(false)} />
       <AdminModal isOpen={isAdminOpen} t={t} onClose={() => setIsAdminOpen(false)} />
+      <PricingPage
+        isOpen={isPricingOpen}
+        onClose={() => setIsPricingOpen(false)}
+        t={t}
+        user={user}
+        quota={{ usedGenerations: 0, limit: 10, isPremium: user?.unlimitedStatus || false }}
+        onLoginRequired={() => { setIsPricingOpen(false); setIsLoginModalOpen(true); }}
+      />
     </div>
   );
 };
