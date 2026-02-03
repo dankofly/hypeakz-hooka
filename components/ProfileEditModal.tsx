@@ -49,7 +49,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ user, onClos
         unlimitedStatus
       });
       setIsSuccess(true);
-      // Wait a moment for the success animation
       setTimeout(() => {
         onClose();
       }, 800);
@@ -61,177 +60,252 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ user, onClos
     }
   };
 
-  const labelClasses = "block text-xs font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mb-1 md:mb-2";
-  // Increased contrast for inputs, less rounded
-  const inputClasses = "w-full p-3 md:p-4 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-sm font-bold text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 shadow-sm";
+  const labelClasses = "block text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] mb-2";
+  const inputClasses = "w-full p-4 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-all text-sm font-semibold text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6">
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-2xl animate-in fade-in duration-500" onClick={() => !isSaving && onClose()} />
-      <div className="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-lg rounded-2xl shadow-2xl animate-in zoom-in fade-in duration-500 overflow-hidden">
-        <div className="p-6 md:p-12 space-y-6 md:space-y-8">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1 md:space-y-2">
-              <h2 className="text-xl md:text-2xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter">{t.profileEdit.title}</h2>
-              <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold">{t.profileEdit.subtitle}</p>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/90 backdrop-blur-2xl animate-in fade-in duration-300" onClick={() => !isSaving && onClose()} />
+
+      <div className="relative bg-white dark:bg-zinc-950 w-full max-w-lg rounded-3xl shadow-2xl animate-in zoom-in-95 fade-in duration-300 overflow-hidden border border-zinc-200 dark:border-zinc-800">
+
+        {/* Header with gradient */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 via-blue-600/10 to-transparent"></div>
+          <div className="relative px-8 pt-8 pb-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-purple-500/25">
+                    {name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tight">{t.profileEdit.title}</h2>
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] font-bold">{t.profileEdit.subtitle}</p>
+                  </div>
+                </div>
+              </div>
+              {!isSaving && !isSuccess && (
+                <button
+                  onClick={onClose}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-white transition-all"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+              )}
             </div>
-            {!isSaving && !isSuccess && (
-              <button 
-                onClick={onClose}
-                className="w-10 h-10 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
-              </button>
+
+            {/* Status Badge */}
+            {unlimitedStatus && (
+              <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-full">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <span className="text-[10px] font-black text-green-600 dark:text-green-400 uppercase tracking-[0.15em]">
+                  Unlimited Access Active
+                </span>
+              </div>
             )}
           </div>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
-            <div className="grid grid-cols-1 gap-4 md:gap-5">
-              <div className="space-y-1">
-                <label className={labelClasses}>{t.profileEdit.fields.name}</label>
-                <input 
-                  type="text" 
-                  value={name} 
-                  onChange={(e) => setName(e.target.value)}
-                  className={inputClasses}
-                  placeholder="e.g. Max Mustermann"
-                  disabled={isSaving || isSuccess}
-                  required
-                />
+        <form onSubmit={handleSubmit}>
+          <div className="px-8 pb-6 space-y-5">
+
+            {/* Personal Info Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-4 bg-purple-500 rounded-full"></div>
+                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">Personal Info</span>
               </div>
 
-              <div className="space-y-1">
-                <label className={labelClasses}>{t.profileEdit.fields.brand}</label>
-                <input 
-                  type="text" 
-                  value={brand} 
-                  onChange={(e) => setBrand(e.target.value)}
-                  className={inputClasses}
-                  placeholder="e.g. My Agency"
-                  disabled={isSaving || isSuccess}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-                <div className="space-y-1">
-                  <label className={labelClasses}>{t.profileEdit.fields.email}</label>
-                  <input 
-                    type="email" 
-                    value={email} 
-                    onChange={(e) => setEmail(e.target.value)}
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className={labelClasses}>{t.profileEdit.fields.name}</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     className={inputClasses}
-                    placeholder="mail@example.com"
+                    placeholder="Max Mustermann"
                     disabled={isSaving || isSuccess}
                     required
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className={labelClasses}>{t.profileEdit.fields.phone}</label>
-                  <input 
-                    type="tel" 
-                    value={phone} 
-                    onChange={(e) => setPhone(e.target.value)}
+
+                <div>
+                  <label className={labelClasses}>{t.profileEdit.fields.brand}</label>
+                  <input
+                    type="text"
+                    value={brand}
+                    onChange={(e) => setBrand(e.target.value)}
                     className={inputClasses}
-                    placeholder="+43..."
+                    placeholder="My Agency"
                     disabled={isSaving || isSuccess}
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelClasses}>{t.profileEdit.fields.email}</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={inputClasses}
+                      placeholder="mail@example.com"
+                      disabled={isSaving || isSuccess}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClasses}>{t.profileEdit.fields.phone}</label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className={inputClasses}
+                      placeholder="+43..."
+                      disabled={isSaving || isSuccess}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Promo Code Section */}
-            <div className="pt-4 md:pt-6 border-t border-zinc-200 dark:border-zinc-800">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className={labelClasses}>{t.profileEdit.promoCode?.label || 'Promo Code'}</label>
-                  {unlimitedStatus && (
-                    <span className="flex items-center gap-1.5 px-3 py-1 bg-green-500/10 border border-green-500/30 rounded-full text-[10px] font-black text-green-600 dark:text-green-400 uppercase tracking-widest">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6 9 17 4 12"/></svg>
-                      {t.profileEdit.promoCode?.unlimited || 'Unlimited'}
-                    </span>
-                  )}
-                </div>
+            <div className="pt-5 border-t border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-1 h-4 bg-gradient-to-b from-amber-500 to-orange-500 rounded-full"></div>
+                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">
+                  {t.profileEdit.promoCode?.label || 'Promo Code'}
+                </span>
+              </div>
 
-                {!unlimitedStatus ? (
+              {!unlimitedStatus ? (
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-zinc-100 to-zinc-50 dark:from-zinc-900 dark:to-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-500">
+                      <path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6"/>
+                      <path d="M12 12V3"/>
+                      <path d="m8 7 4-4 4 4"/>
+                    </svg>
+                    <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400">
+                      {t.profileEdit.promoCode?.placeholder || 'Enter your promo code to unlock unlimited access'}
+                    </span>
+                  </div>
+
                   <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={promoCode}
-                      onChange={(e) => setPromoCode(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handlePromoCodeSubmit())}
-                      className={`${inputClasses} flex-1 ${promoStatus === 'error' ? 'border-red-500 focus:border-red-500' : ''}`}
-                      placeholder={t.profileEdit.promoCode?.placeholder || 'Enter code...'}
-                      disabled={isSaving || isSuccess}
-                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={promoCode}
+                        onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handlePromoCodeSubmit())}
+                        className={`w-full px-4 py-3.5 bg-white dark:bg-zinc-950 border-2 rounded-xl text-sm font-bold text-zinc-900 dark:text-white placeholder-zinc-400 uppercase tracking-wider transition-all outline-none ${
+                          promoStatus === 'error'
+                            ? 'border-red-500 focus:border-red-500'
+                            : 'border-zinc-200 dark:border-zinc-700 focus:border-purple-500'
+                        }`}
+                        placeholder="XXXX-XXXX"
+                        disabled={isSaving || isSuccess}
+                      />
+                      {promoStatus === 'error' && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-red-500">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="m15 9-6 6M9 9l6 6"/>
+                          </svg>
+                        </div>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={handlePromoCodeSubmit}
                       disabled={!promoCode.trim() || isSaving || isSuccess}
-                      className="px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest bg-purple-600 text-white hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
                     >
                       {t.profileEdit.promoCode?.activate || 'Activate'}
                     </button>
                   </div>
-                ) : (
-                  <p className="text-xs text-zinc-500 font-medium">
-                    {t.profileEdit.promoCode?.activeMessage || 'You have unlimited access to all features.'}
-                  </p>
-                )}
 
-                {promoStatus === 'error' && (
-                  <p className="text-xs text-red-500 font-bold animate-in fade-in duration-200">
-                    {t.profileEdit.promoCode?.invalid || 'Invalid promo code'}
-                  </p>
-                )}
-                {promoStatus === 'success' && (
-                  <p className="text-xs text-green-500 font-bold animate-in fade-in duration-200">
-                    {t.profileEdit.promoCode?.success || 'Promo code activated! Save to apply.'}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="pt-6 md:pt-8 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-3">
-              {!isSaving && !isSuccess && (
-                <button 
-                  type="button"
-                  onClick={onClose}
-                  className="px-6 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
-                >
-                  {t.profileEdit.cancel}
-                </button>
+                  {promoStatus === 'error' && (
+                    <p className="mt-3 text-xs text-red-500 font-bold flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 8v4M12 16h.01"/>
+                      </svg>
+                      {t.profileEdit.promoCode?.invalid || 'Invalid promo code'}
+                    </p>
+                  )}
+                  {promoStatus === 'success' && (
+                    <p className="mt-3 text-xs text-green-500 font-bold flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M20 6 9 17 4 12"/>
+                      </svg>
+                      {t.profileEdit.promoCode?.success || 'Code activated! Save to apply.'}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/5 border border-green-500/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-green-500">
+                        <path d="M20 6 9 17 4 12"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-green-600 dark:text-green-400">
+                        {t.profileEdit.promoCode?.unlimited || 'Unlimited Access'}
+                      </p>
+                      <p className="text-xs text-zinc-500">
+                        {t.profileEdit.promoCode?.activeMessage || 'All premium features are unlocked'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               )}
-              <button 
-                type="submit"
-                disabled={isSaving || isSuccess}
-                className={`px-8 py-3 rounded-lg text-xs font-black uppercase tracking-widest haptic-btn shadow-md transition-all flex items-center gap-3 ${
-                  isSuccess 
-                    ? 'bg-green-600 text-white' 
-                    : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200'
-                }`}
-              >
-                {isSaving ? (
-                  <>
-                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                    <span>{t.profileEdit.saving}</span>
-                  </>
-                ) : isSuccess ? (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M20 6 9 17 4 12"/></svg>
-                    <span>{t.profileEdit.saved}</span>
-                  </>
-                ) : (
-                  t.profileEdit.save
-                )}
-              </button>
             </div>
-          </form>
-        </div>
-        
-        {/* Visual Decoration */}
-        <div className={`h-1.5 w-full transition-all duration-1000 ${isSaving ? 'bg-zinc-200 dark:bg-zinc-800' : 'bg-gradient-to-r from-purple-600 via-blue-500 to-purple-600'}`}>
-          {isSaving && <div className="h-full bg-purple-500 animate-[shimmer_2s_linear_infinite]" style={{ width: '40%' }}></div>}
-        </div>
+          </div>
+
+          {/* Footer Actions */}
+          <div className="px-8 py-5 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-3">
+            {!isSaving && !isSuccess && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all"
+              >
+                {t.profileEdit.cancel}
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={isSaving || isSuccess}
+              className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2.5 shadow-lg ${
+                isSuccess
+                  ? 'bg-green-500 text-white shadow-green-500/25'
+                  : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 shadow-zinc-900/20 dark:shadow-white/10'
+              }`}
+            >
+              {isSaving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                  <span>{t.profileEdit.saving}</span>
+                </>
+              ) : isSuccess ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6 9 17 4 12"/></svg>
+                  <span>{t.profileEdit.saved}</span>
+                </>
+              ) : (
+                t.profileEdit.save
+              )}
+            </button>
+          </div>
+        </form>
+
+        {/* Bottom gradient bar */}
+        <div className="h-1 w-full bg-gradient-to-r from-purple-600 via-blue-500 to-purple-600"></div>
       </div>
     </div>
   );
