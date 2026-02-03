@@ -44,6 +44,8 @@ const callApi = async (action: string, payload: any = {}, timeoutMs: number = 50
       headers['Authorization'] = `Bearer ${token}`;
     }
 
+    console.log(`[API] Calling ${action} with timeout ${timeoutMs}ms`);
+
     const response = await fetch('/.netlify/functions/api', {
       method: 'POST',
       headers,
@@ -53,23 +55,33 @@ const callApi = async (action: string, payload: any = {}, timeoutMs: number = 50
 
     clearTimeout(timeoutId);
 
+    console.log(`[API] Response status: ${response.status}`);
+
     if (!response.ok) {
       if (response.status === 401) {
         console.warn('Unauthorized API call - user may need to re-authenticate');
       }
-      return null;
+      const errorText = await response.text();
+      console.error(`[API] Error response: ${errorText}`);
+      return { _error: true, status: response.status, message: errorText };
     }
 
     // Check content type to avoid crashing on HTML (404/500 pages)
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.indexOf("application/json") === -1) {
-      return null;
+      console.error(`[API] Non-JSON response: ${contentType}`);
+      return { _error: true, message: 'Non-JSON response from server' };
     }
 
     return await response.json();
-  } catch (error) {
-    // Ignore AbortErrors (Timeouts) and standard fetch errors
-    return null;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      console.error(`[API] Request timed out after ${timeoutMs}ms`);
+      return { _error: true, message: `Timeout nach ${timeoutMs / 1000}s` };
+    }
+    console.error(`[API] Fetch error:`, error);
+    return { _error: true, message: error.message || 'Netzwerkfehler' };
   }
 };
 
@@ -182,11 +194,18 @@ export const db = {
 
   async createCheckoutSession(userId: string, email: string): Promise<{ url?: string; error?: string }> {
     try {
-      // Use longer timeout (20s) for Stripe operations
-      const response = await callApi('create-checkout-session', { userId, email }, 20000);
+      // Use longer timeout (30s) for Stripe operations
+      const response = await callApi('create-checkout-session', { userId, email }, 30000);
+
+      console.log('[Checkout] API Response:', response);
 
       if (!response) {
         return { error: 'Server nicht erreichbar. Bitte versuche es später erneut.' };
+      }
+
+      // Handle error responses from callApi
+      if (response._error) {
+        return { error: response.message || 'Server-Fehler' };
       }
 
       if (response.url) {
