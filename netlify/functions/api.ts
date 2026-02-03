@@ -62,6 +62,7 @@ const verifyFirebaseToken = async (authHeader: string | undefined): Promise<stri
 };
 
 const headers = {
+  "Content-Type": "application/json",
   "Access-Control-Allow-Origin": "*", // Note: In production, strict specific origins are recommended
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
