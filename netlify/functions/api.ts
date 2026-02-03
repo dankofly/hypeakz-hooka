@@ -395,13 +395,20 @@ export const handler = async (event: any) => {
 
       // --- STRIPE CHECKOUT ---
       case 'create-checkout-session': {
+        console.log('[STRIPE] Starting checkout session creation');
+        console.log('[STRIPE] STRIPE_SECRET_KEY exists:', !!process.env.STRIPE_SECRET_KEY);
+        console.log('[STRIPE] STRIPE_PRICE_ID:', STRIPE_PRICE_ID);
+
         const stripe = getStripe();
         if (!stripe) {
-          result = { error: 'Stripe not configured' };
+          console.error('[STRIPE] Stripe not configured - missing STRIPE_SECRET_KEY');
+          result = { error: 'Stripe not configured - missing secret key' };
           break;
         }
 
         const { userId, email } = payload;
+        console.log('[STRIPE] userId:', userId, 'email:', email);
+
         if (!userId || !email) {
           result = { error: 'Missing userId or email' };
           break;
@@ -435,27 +442,35 @@ export const handler = async (event: any) => {
 
         // Create checkout session
         const baseUrl = process.env.URL || 'https://hooka.hypeakz.io';
-        const session = await stripe.checkout.sessions.create({
-          customer: customerId,
-          payment_method_types: ['card'],
-          line_items: [{
-            price: STRIPE_PRICE_ID,
-            quantity: 1
-          }],
-          mode: 'subscription',
-          success_url: `${baseUrl}?checkout=success`,
-          cancel_url: `${baseUrl}?checkout=cancelled`,
-          metadata: {
-            userId: userId
-          },
-          subscription_data: {
+        console.log('[STRIPE] Creating checkout session with baseUrl:', baseUrl);
+
+        try {
+          const session = await stripe.checkout.sessions.create({
+            customer: customerId,
+            payment_method_types: ['card'],
+            line_items: [{
+              price: STRIPE_PRICE_ID,
+              quantity: 1
+            }],
+            mode: 'subscription',
+            success_url: `${baseUrl}?checkout=success`,
+            cancel_url: `${baseUrl}?checkout=cancelled`,
             metadata: {
               userId: userId
+            },
+            subscription_data: {
+              metadata: {
+                userId: userId
+              }
             }
-          }
-        });
+          });
 
-        result = { url: session.url };
+          console.log('[STRIPE] Checkout session created:', session.id);
+          result = { url: session.url };
+        } catch (stripeError: any) {
+          console.error('[STRIPE] Checkout session creation failed:', stripeError.message);
+          result = { error: `Stripe error: ${stripeError.message}` };
+        }
         break;
       }
 
